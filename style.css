@@ -154,6 +154,16 @@ input[type="text"]:focus {
 /* 소전 모양이 여러 개인 글자는 나란히 들어가도록 조금 작게 */
 .pair .s.multi .glyph { width: .8em; height: .8em; }
 
+/* ===== 출처·라이선스 (맨 아래) ===== */
+.credits {
+  max-width: 860px; margin: -50px auto 0; padding: 0 20px 40px;
+  font-size: .72rem; line-height: 1.7; color: var(--muted); text-align: center; word-break: keep-all;
+}
+.credits p { margin-top: 6px; }
+.credits b { color: var(--ink); font-weight: 400; opacity: .8; }
+.credits a { color: var(--gold); text-decoration: none; border-bottom: 1px dotted var(--gold); }
+@media (display-mode: standalone) { .credits { padding-bottom: calc(40px + env(safe-area-inset-bottom)); } }
+
 /* ===== 휴대폰 앱 설치 ===== */
 .btn.install { margin-top: 14px; border-color: var(--gold); color: var(--gold); }
 [hidden] { display: none !important; }
