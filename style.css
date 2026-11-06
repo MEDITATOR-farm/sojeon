@@ -154,6 +154,14 @@ input[type="text"]:focus {
 /* 소전 모양이 여러 개인 글자는 나란히 들어가도록 조금 작게 */
 .pair .s.multi .glyph { width: .8em; height: .8em; }
 
+/* ===== 휴대폰 앱 설치 ===== */
+.btn.install { margin-top: 14px; border-color: var(--gold); color: var(--gold); }
+[hidden] { display: none !important; }
+/* 앱으로 실행할 때 화면 위·아래(노치, 홈 막대) 여백 확보 */
+@media (display-mode: standalone) {
+  .wrap { padding-top: calc(16px + env(safe-area-inset-top)); padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
+}
+
 /* ===== 음·훈으로 찾기 ===== */
 input[type="text"].yin-input { height: 64px; font-family: "Noto Serif KR", serif; font-size: 1.6rem; }
 input[type="text"].yin-input::placeholder { color: var(--muted); opacity: .6; font-size: 1.1rem; }

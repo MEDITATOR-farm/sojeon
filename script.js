@@ -314,6 +314,32 @@ yinInput.addEventListener("input", (e) => {
 });
 yinInput.addEventListener("compositionend", searchYin);
 
+// ===== 휴대폰 앱으로 설치하기 (PWA) =====
+// 오프라인 저장소 등록: 한 번 열어 본 글자는 인터넷이 없어도 다시 볼 수 있음
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+const installBtn = document.getElementById("btn-install");
+let installEvent = null;
+// 안드로이드(크롬·삼성 인터넷): 설치 가능하면 버튼을 보여줌
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  installEvent = e;
+  installBtn.hidden = false;
+});
+installBtn.addEventListener("click", async () => {
+  if (!installEvent) return;
+  installEvent.prompt();
+  await installEvent.userChoice;
+  installEvent = null;
+  installBtn.hidden = true;
+});
+window.addEventListener("appinstalled", () => { installBtn.hidden = true; showToast("앱이 설치되었습니다"); });
+// 아이폰(사파리)은 설치 버튼이 없으므로 안내문을 보여줌 (이미 앱으로 실행 중이면 숨김)
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isStandalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+if (isIOS && !isStandalone) document.getElementById("ios-hint").hidden = false;
+
 // 처음 열었을 때 한 번 변환
 convert();
 loadHuneum(); // 훈음 사전 불러오기

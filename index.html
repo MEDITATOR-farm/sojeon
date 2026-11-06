@@ -2,7 +2,16 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- 휴대폰 앱처럼 설치해서 쓰기 위한 설정 -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#14110f">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="소전">
   <title>해서 → 소전 변환기 | 楷書 to 小篆</title>
   <meta name="description" content="해서체 한자를 입력하면 유니코드 소전(小篆) 글자로 바꿔주는 변환기">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,6 +24,8 @@
       <div class="seal-stamp">篆</div>
       <h1>해서 <span class="arrow">→</span> 소전 변환기</h1>
       <p class="sub">楷書를 입력하면 小篆으로 바꿔 드립니다</p>
+      <button id="btn-install" class="btn install" type="button" hidden>📲 휴대폰에 앱으로 설치</button>
+      <p id="ios-hint" class="hint" hidden>아이폰: 아래 공유 버튼 → <b>홈 화면에 추가</b>를 누르면 앱처럼 쓸 수 있습니다</p>
     </header>
 
     <section class="card">
