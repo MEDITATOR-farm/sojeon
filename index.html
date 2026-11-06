@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>해서 → 소전 변환기 | 楷書 to 小篆</title>
+  <meta name="description" content="해서체 한자를 입력하면 유니코드 소전(小篆) 글자로 바꿔주는 변환기">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="hero">
+      <div class="seal-stamp">篆</div>
+      <h1>해서 <span class="arrow">→</span> 소전 변환기</h1>
+      <p class="sub">楷書를 입력하면 小篆으로 바꿔 드립니다</p>
+    </header>
+
+    <section class="card">
+      <label for="input" class="label">해서 입력 (楷書)</label>
+      <input type="text" id="input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+
+      <div class="buttons">
+        <button id="btn-convert" class="btn primary">변환하기</button>
+        <button id="btn-clear" class="btn">지우기</button>
+      </div>
+      <p id="font-status" class="hint" style="display:none;"></p>
+    </section>
+
+    <section class="card">
+      <div class="label">소전 결과 (小篆)</div>
+      <div id="output" class="output"></div>
+      <p id="stats" class="hint"></p>
+    </section>
+
+    <section class="card">
+      <div class="label">글자별 대응표</div>
+      <div id="pairs" class="pairs"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="data.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

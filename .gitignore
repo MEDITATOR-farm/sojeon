@@ -1,0 +1,8 @@
+# 깃허브에 올리지 않을 파일 목록
+# fonts, glyphs 폴더 및 원본 데이터 파일은 용량이 크고 사이트 실행에 직접 필요하지 않음
+fonts/
+glyphs/
+*.csv
+*.txt
+*.json
+!hanja.txt

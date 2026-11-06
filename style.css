@@ -1,0 +1,247 @@
+/* 소전 글꼴 연결: fonts 폴더에 seal.ttf 파일을 넣으면 자동으로 사용됩니다 */
+@font-face {
+  font-family: "Seal";
+  src: url("fonts/seal.woff2"), url("fonts/seal.ttf"), url("fonts/seal.otf");
+}
+
+/* 색상 모음 */
+:root {
+  --bg: #14110f;
+  --paper: rgba(255, 248, 235, 0.05);
+  --line: rgba(255, 230, 190, 0.15);
+  --ink: #f3e9d8;
+  --muted: #a89a86;
+  --red: #c8372d;
+  --gold: #d9b26f;
+  --seal-font: "UserSeal", "Seal", "Planschrift P1", "Planschrift P2", "Plangothic P1", "Plangothic P2", "Noto Serif TC", serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  min-height: 100vh;
+  font-family: "Noto Serif KR", serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 15% 10%, rgba(200, 55, 45, 0.18), transparent 40%),
+    radial-gradient(circle at 85% 90%, rgba(217, 178, 111, 0.15), transparent 45%),
+    var(--bg);
+}
+
+.wrap { max-width: 860px; margin: 0 auto; padding: 48px 20px 80px; }
+
+/* 상단 제목 */
+.hero { text-align: center; margin-bottom: 36px; }
+.seal-stamp {
+  display: inline-grid; place-items: center;
+  width: 72px; height: 72px; margin-bottom: 16px;
+  font-family: "Noto Serif TC", serif; font-size: 40px; font-weight: 700;
+  color: #fff; background: var(--red); border-radius: 10px;
+  box-shadow: 0 0 0 4px var(--bg), 0 0 0 6px var(--red), 0 10px 30px rgba(200,55,45,.4);
+  transform: rotate(-6deg);
+  animation: stamp 0.8s ease-out;
+}
+@keyframes stamp {
+  0% { transform: scale(2) rotate(-20deg); opacity: 0; }
+  70% { transform: scale(0.95) rotate(-4deg); opacity: 1; }
+  100% { transform: scale(1) rotate(-6deg); }
+}
+h1 { font-size: 2.2rem; letter-spacing: 2px; }
+.arrow { color: var(--gold); }
+.sub { color: var(--muted); margin-top: 8px; }
+
+/* 카드 상자 */
+.card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 20px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px); /* 아이폰(Safari)용 */
+  text-align: center; /* 카드 내부 기본 가운데 정렬 */
+}
+.label { display: block; color: var(--gold); font-weight: 700; margin-bottom: 12px; text-align: center; }
+
+/* 입력창: 브라우저 표준 input으로 가로 세로 완벽한 중앙 정렬 및 깜빡이는 커서 보장 */
+input[type="text"] {
+  width: 100%;
+  height: 90px;
+  border: 1px solid var(--line);
+  background: rgba(0,0,0,.3);
+  border-radius: 12px;
+  outline: none;
+  font-family: "Noto Serif TC", serif;
+  font-size: 2rem;
+  color: var(--ink);
+  text-align: center;
+  caret-color: var(--gold); /* 깜빡이는 커서 색상 */
+  transition: border-color .2s, box-shadow .2s;
+  padding: 0 16px;
+}
+input[type="text"]:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(217,178,111,.2);
+}
+
+/* 버튼 */
+.buttons { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.btn {
+  padding: 10px 20px; font: inherit; font-size: .95rem; cursor: pointer;
+  color: var(--ink); background: rgba(255,255,255,.06);
+  border: 1px solid var(--line); border-radius: 10px;
+  transition: transform .15s, background .2s;
+}
+.btn.primary { background: linear-gradient(135deg, var(--red), #8f2219); border-color: transparent; color: #fff; }
+/* 마우스가 있는 기기(PC)에서만 올렸을 때 효과 → 휴대폰에서 버튼이 떠 있는 채로 남는 문제 방지 */
+@media (hover: hover) {
+  .btn:hover { transform: translateY(-2px); background: rgba(255,255,255,.12); }
+  .btn.primary:hover { background: linear-gradient(135deg, var(--red), #8f2219); box-shadow: 0 6px 20px rgba(200,55,45,.45); }
+}
+.btn:active { transform: scale(.97); } /* 손가락으로 누르는 순간 살짝 눌리는 느낌 */
+
+.hint { color: var(--muted); font-size: .85rem; margin-top: 12px; line-height: 1.6; }
+
+/* 결과 */
+.output {
+  min-height: 100px; padding: 20px;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; /* 가운데 정렬 */
+  font-family: var(--seal-font); font-size: 3rem; line-height: 1.5;
+  background: rgba(0,0,0,.3); border-radius: 12px;
+  text-align: center;
+}
+.output .missing { color: var(--muted); opacity: .6; } /* 대응 글자가 없는 경우 */
+.output span { display: inline-flex; align-items: center; justify-content: center; animation: pop .4s ease both; }
+@keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* 글자별 대응표 */
+.pairs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center; /* 카드 묶음 가로 가운데 */
+  gap: 12px;
+  width: 100%;
+}
+.pair {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 140px;
+  padding: 14px 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(0,0,0,.25);
+  transition: transform .2s, border-color .2s;
+}
+@media (hover: hover) {
+  .pair:hover { transform: translateY(-3px); border-color: var(--gold); }
+}
+.pair .k { font-family: "Noto Serif TC", serif; font-size: 1.5rem; }
+.pair .hun { font-size: .82rem; color: var(--ink); opacity: .85; min-height: 1.3em; margin-top: 2px; word-break: keep-all; } /* 훈음 (예: 하늘 천) */
+.pair .s {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px;
+  font-family: var(--seal-font); font-size: 2.6rem; color: var(--gold); margin: 8px 0; min-height: 1.2em;
+}
+.pair .cp { font-size: .7rem; color: var(--muted); word-break: break-all; }
+.pair.none .s { color: var(--muted); font-size: .95rem; }
+
+/* 깃허브에서 가져온 소전 그림 크기 (글자 크기에 맞춤) */
+.glyph { width: 1.1em; height: 1.1em; object-fit: contain; vertical-align: middle; filter: invert(1) sepia(.3); }
+.pair .glyph { width: 1.15em; height: 1.15em; }
+/* 소전 모양이 여러 개인 글자는 나란히 들어가도록 조금 작게 */
+.pair .s.multi .glyph { width: .8em; height: .8em; }
+
+/* 알림 */
+.toast {
+  position: fixed; left: 50%; bottom: 30px; transform: translate(-50%, 20px);
+  padding: 10px 20px; border-radius: 10px; background: var(--gold); color: #1a1a1a;
+  opacity: 0; transition: .3s; pointer-events: none; z-index: 100;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ===== 모바일(휴대폰) 화면용 설정 ===== */
+/* 화면 폭이 600px 이하(휴대폰)일 때 적용 */
+@media (max-width: 600px) {
+  .wrap { padding: 16px 12px 60px; }
+
+  .hero { margin-bottom: 16px; }
+  .seal-stamp { width: 50px; height: 50px; font-size: 26px; margin-bottom: 8px; }
+  h1 { font-size: 1.4rem; letter-spacing: 1px; }
+  .sub { font-size: .85rem; margin-top: 4px; }
+
+  /* 카드/창 크기와 여백은 화면에 맞게 자연스럽게 유지 */
+  /* 카드 안 내용 가운데 정렬 */
+  .card {
+    padding: 16px 12px;
+    border-radius: 14px;
+    margin-bottom: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .label { font-size: 1rem; margin-bottom: 10px; font-weight: bold; width: 100%; text-align: center; }
+
+
+  /* 1. 해서 입력창: 가로·세로 정중앙 + 깜빡이는 커서 */
+  input[type="text"] {
+    width: 100%;
+    height: 90px;
+    font-size: 2.6rem; /* 한 줄에 6~7글자 정도 보이는 크기 */
+    text-align: center;
+    padding: 0 10px;
+  }
+
+  /* 버튼 2개 */
+  .buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 14px;
+    width: 100%;
+  }
+  .btn { padding: 14px 6px; text-align: center; font-size: 1.05rem; }
+
+  /* 2. 소전 결과 창: 한 줄에 4글자 정도 들어가는 크기 */
+  .output {
+    width: 100%;
+    min-height: 110px;
+    font-size: 3.8rem;
+    line-height: 1.3;
+    padding: 14px 6px;
+    gap: 8px;
+  }
+  /* 그림 크기는 글자 크기(em)에 맞춰 자동으로 따라감 */
+  .output .glyph { width: 1.1em; height: 1.1em; }
+
+  /* 3. 글자별 대응표: 2칸씩, 같은 줄 카드는 높이를 똑같이 */
+  .pairs {
+    width: 100%;
+    gap: 12px;
+    align-items: stretch; /* 같은 줄 카드 높이 맞추기 */
+  }
+  .pair {
+    width: calc(50% - 6px); /* 2칸 + 사이 간격 12px = 딱 100% */
+    max-width: 180px;
+    justify-content: flex-start;
+    padding: 14px 6px;
+  }
+  .pair .k { font-size: 2.6rem; line-height: 1.2; }   /* 해서 글자 */
+  .pair .hun { font-size: 1.05rem; margin: 4px 0; }   /* 훈음(뜻과 소리) */
+  .pair .s { font-size: 4.6rem; margin: 6px 0; }      /* 소전 글자 */
+  .pair .cp { font-size: 0.75rem; margin-top: auto; } /* 코드 번호는 카드 맨 아래에 */
+  .pair.none .s { font-size: 1.1rem; }
+
+  .toast { bottom: 20px; width: max-content; max-width: 90%; }
+}
+
+/* 아주 작은 휴대폰(폭 340px 이하) */
+@media (max-width: 340px) {
+  input[type="text"] { font-size: 2.2rem; }
+  .output { font-size: 3.2rem; }
+  .pair .k { font-size: 2.2rem; }
+  .pair .s { font-size: 3.8rem; }
+}
