@@ -480,6 +480,134 @@ document.getElementById("rs-box").addEventListener("toggle", (e) => {
   if (e.target.open && !rsRadicals.children.length && rsMode === "rad") rsShowRadicals();
 });
 
+// ===== 손글씨로 찾기 =====
+// HanziLookupJS(GPL) 사용: hwr 폴더의 프로그램과 획 자료(약 2MB)는 이 칸을 처음 펼칠 때만 불러옴
+const hwBox = document.getElementById("hw-box");
+const hwCanvas = document.getElementById("hw-canvas");
+const hwList = document.getElementById("hw-list");
+const hwCount = document.getElementById("hw-count");
+const hwCtx = hwCanvas.getContext("2d");
+let hwStrokes = [];      // 쓴 획들: [[[x, y], [x, y], ...], ...]
+let hwCurrent = null;    // 지금 쓰고 있는 획
+let hwReady = false;     // 인식 자료를 다 불러왔는지
+let hwLoading = false;
+
+function hwLoad() {
+  if (hwReady || hwLoading) return;
+  hwLoading = true;
+  hwCount.textContent = "손글씨 인식 자료를 불러오는 중… (처음 한 번만)";
+  const s = document.createElement("script");
+  s.src = "hwr/hanzilookup.min.js";
+  s.onload = () => {
+    let left = 2, ok = 0;
+    const done = (success) => {
+      if (success) ok++;
+      if (--left) return;
+      hwLoading = false;
+      hwReady = ok > 0;
+      hwCount.textContent = hwReady ? "획 순서대로 또박또박 쓰면 더 잘 찾습니다" : "손글씨 인식 자료를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.";
+      if (hwReady && hwStrokes.length) hwLookup();
+    };
+    HanziLookup.init("mmah", "hwr/mmah.json", done);
+    HanziLookup.init("orig", "hwr/orig.json", done);
+  };
+  s.onerror = () => { hwLoading = false; hwCount.textContent = "손글씨 인식 프로그램을 불러오지 못했습니다."; };
+  document.head.appendChild(s);
+}
+
+// 쓰는 칸 크기를 화면에 맞추고 다시 그림 (고해상도 화면에서도 선명하게)
+function hwResize() {
+  const size = Math.min(hwCanvas.parentElement.clientWidth, 320);
+  const dpr = window.devicePixelRatio || 1;
+  hwCanvas.style.width = hwCanvas.style.height = size + "px";
+  hwCanvas.width = hwCanvas.height = Math.round(size * dpr);
+  hwCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  hwDraw();
+}
+
+// 바탕의 米자 안내선 + 쓴 획 그리기
+function hwDraw() {
+  const n = hwCanvas.width / (window.devicePixelRatio || 1);
+  hwCtx.clearRect(0, 0, n, n);
+  hwCtx.strokeStyle = "rgba(217,178,111,.18)";
+  hwCtx.lineWidth = 1;
+  hwCtx.setLineDash([4, 4]);
+  hwCtx.beginPath();
+  hwCtx.moveTo(n / 2, 0); hwCtx.lineTo(n / 2, n);
+  hwCtx.moveTo(0, n / 2); hwCtx.lineTo(n, n / 2);
+  hwCtx.moveTo(0, 0); hwCtx.lineTo(n, n);
+  hwCtx.moveTo(n, 0); hwCtx.lineTo(0, n);
+  hwCtx.stroke();
+  hwCtx.setLineDash([]);
+  hwCtx.strokeStyle = "#f3e9d8";
+  hwCtx.lineWidth = Math.max(4, n / 45);
+  hwCtx.lineCap = hwCtx.lineJoin = "round";
+  hwStrokes.concat(hwCurrent ? [hwCurrent] : []).forEach((st) => {
+    hwCtx.beginPath();
+    st.forEach(([x, y], i) => (i ? hwCtx.lineTo(x, y) : hwCtx.moveTo(x, y)));
+    if (st.length === 1) hwCtx.lineTo(st[0][0] + 0.1, st[0][1]);
+    hwCtx.stroke();
+  });
+}
+
+function hwPoint(e) {
+  const r = hwCanvas.getBoundingClientRect();
+  return [Math.round(e.clientX - r.left), Math.round(e.clientY - r.top)];
+}
+hwCanvas.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  hwCanvas.setPointerCapture(e.pointerId);
+  hwCurrent = [hwPoint(e)];
+  hwDraw();
+});
+hwCanvas.addEventListener("pointermove", (e) => {
+  if (!hwCurrent) return;
+  const p = hwPoint(e), last = hwCurrent[hwCurrent.length - 1];
+  if (Math.abs(p[0] - last[0]) + Math.abs(p[1] - last[1]) < 2) return; // 너무 촘촘한 점은 건너뜀
+  hwCurrent.push(p);
+  hwDraw();
+});
+function hwEnd() {
+  if (!hwCurrent) return;
+  hwStrokes.push(hwCurrent);
+  hwCurrent = null;
+  hwDraw();
+  hwLookup();
+}
+hwCanvas.addEventListener("pointerup", hwEnd);
+hwCanvas.addEventListener("pointercancel", hwEnd);
+
+// 쓴 획으로 글자 찾기: 두 가지 자료로 찾아 점수 높은 순으로 합치고, 소전이 있는 글자만 보여줌
+function hwLookup() {
+  hwList.innerHTML = "";
+  if (!hwStrokes.length) { hwCount.textContent = "획 순서대로 또박또박 쓰면 더 잘 찾습니다"; return; }
+  if (!hwReady) { hwLoad(); return; }
+  const analyzed = new HanziLookup.AnalyzedCharacter(hwStrokes);
+  const best = new Map();
+  let pending = 0;
+  const collect = (matches) => {
+    // 두 자료의 점수 크기가 달라서 점수 대신 순위로 합침 (양쪽에서 모두 앞쪽이면 더 위로)
+    matches.forEach((m, rank) => best.set(m.character, (best.get(m.character) || 0) + 1 / (rank + 1)));
+    if (--pending) return;
+    const hits = [...best.entries()].sort((a, b) => b[1] - a[1]).map(([ch]) => ch).filter(hasSeal).slice(0, 16);
+    hwList.innerHTML = "";
+    hits.forEach((ch) => hwList.appendChild(rsButton({ ch })));
+    hwCount.textContent = hits.length
+      ? `${hwStrokes.length}획 · 비슷한 글자 ${hits.length}개 (앞쪽일수록 비슷함)`
+      : `${hwStrokes.length}획 · 소전이 있는 비슷한 글자를 찾지 못했습니다. 이어서 써 보세요`;
+  };
+  ["mmah", "orig"].forEach((name) => {
+    if (!HanziLookup.data[name]) return;
+    pending++;
+    new HanziLookup.Matcher(name).match(analyzed, 30, collect);
+  });
+}
+
+document.getElementById("hw-undo").addEventListener("click", () => { hwStrokes.pop(); hwDraw(); hwLookup(); });
+document.getElementById("hw-clear").addEventListener("click", () => { hwStrokes = []; hwDraw(); hwLookup(); });
+hwBox.addEventListener("toggle", () => { if (hwBox.open) { hwResize(); hwLoad(); } });
+window.addEventListener("resize", () => { if (hwBox.open) hwResize(); });
+
 yinInput.addEventListener("input", (e) => {
   if (e.isComposing) return;
   searchYin();

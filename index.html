@@ -36,6 +36,19 @@
     </section>
 
     <section class="card">
+      <details id="hw-box" class="rs-box">
+        <summary class="label">손글씨로 찾기 <span class="rs-sub">손가락으로 그려서</span></summary>
+        <div class="hw-wrap"><canvas id="hw-canvas" class="hw-canvas" aria-label="한자를 손으로 쓰는 칸"></canvas></div>
+        <div class="buttons hw-buttons">
+          <button type="button" id="hw-undo" class="btn">한 획 지우기</button>
+          <button type="button" id="hw-clear" class="btn">모두 지우기</button>
+        </div>
+        <p id="hw-count" class="hint">획 순서대로 또박또박 쓰면 더 잘 찾습니다</p>
+        <div id="hw-list" class="rs-grid"></div>
+      </details>
+    </section>
+
+    <section class="card">
       <details id="rs-box" class="rs-box">
         <summary class="label">부수·획수로 찾기 <span class="rs-sub">음·뜻을 모를 때</span></summary>
         <div class="rs-mode" role="tablist">

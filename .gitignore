@@ -6,3 +6,6 @@ glyphs/
 *.txt
 *.json
 !hanja.txt
+# 손글씨 인식 자료와 라이선스는 사이트에 필요하므로 올림
+!hwr/*.json
+!hwr/*.txt
