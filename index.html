@@ -18,6 +18,13 @@
     </header>
 
     <section class="card">
+      <label for="yin-input" class="label">음·훈으로 찾기</label>
+      <input type="text" id="yin-input" class="yin-input" placeholder="예: 천 또는 하늘" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <p id="yin-count" class="hint"></p>
+      <div id="yin-list" class="yin-list"></div>
+    </section>
+
+    <section class="card">
       <label for="input" class="label">해서 입력 (楷書)</label>
       <input type="text" id="input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
 
@@ -43,6 +50,7 @@
   <div id="toast" class="toast"></div>
 
   <script src="data.js"></script>
+  <script src="shuowen.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

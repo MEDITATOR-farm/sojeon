@@ -25,6 +25,54 @@ const CUSTOM_SEAL_MAP = {
 // ===== 훈·음(뜻과 소리) 사전 =====
 // 공개 한자 사전(libhangul)을 인터넷에서 불러옵니다. 줄 모양 예: "천:天:하늘 천"
 const HUNEUM = {}; // 예: HUNEUM["天"] = ["하늘 천"]
+const YIN_INDEX = {}; // 음 → 한자 목록. 예: YIN_INDEX["천"] = ["天", "千", ...]
+
+// 음 목록에 한자 하나 넣기 (같은 글자 두 번 안 넣음)
+function addYin(yin, ch) {
+  if (!YIN_INDEX[yin]) YIN_INDEX[yin] = [];
+  if (!YIN_INDEX[yin].includes(ch)) YIN_INDEX[yin].push(ch);
+}
+
+// ===== 說文解字 원본 소전 그림 (崇羲篆體字形表) =====
+// shuowen.js 의 SHUOWEN_ROWS: [해서, 원본 쪽, 칸 번호, 重文 표기]
+// 그림은 원본 쪽마다 한 장(shuowen/p001.png …)에 10칸씩 묶여 있음
+const SHUOWEN = {}; // 예: SHUOWEN["禱"] = [{p:1, k:54, z:""}, {p:1, k:55, z:"或"}]
+const ZHONGWEN = { "或": "或體", "古": "古文", "篆": "篆文", "籀": "籀文", "奇": "奇字", "俗": "俗字" };
+(function buildShuowen() {
+  if (typeof SHUOWEN_ROWS === "undefined") return;
+  let head = null; // 바로 앞의 정자(正篆) — 重文은 정자 밑에 함께 묶음
+  SHUOWEN_ROWS.forEach(([ch, p, k, z]) => {
+    const item = { ch, p, k, z };
+    if (!z) {
+      head = ch;
+      if (!SHUOWEN[ch]) SHUOWEN[ch] = [];
+      SHUOWEN[ch].unshift(item);                 // 정자는 맨 앞
+    } else {
+      if (head) SHUOWEN[head].push(item);        // 정자 밑에 重文으로 붙임
+      if (!SHUOWEN[ch]) SHUOWEN[ch] = [item];    // 重文 글자 자체로도 찾을 수 있게
+    }
+  });
+  if (typeof EXTRA_YIN !== "undefined") {
+    Object.entries(EXTRA_YIN).forEach(([ch, y]) => y.split(" ").forEach(v => addYin(v, ch)));
+  }
+})();
+
+// 說文 원본 그림 한 칸 만들기 (글자 크기(em)에 맞춰 커지고 작아짐)
+function makeShuowenImage(item) {
+  const el = document.createElement("span");
+  el.className = "sw-glyph";
+  el.style.backgroundImage = `url(shuowen/p${String(item.p).padStart(3, "0")}.png)`;
+  el.style.setProperty("--x", item.k % 10);
+  el.style.setProperty("--y", Math.floor(item.k / 10));
+  el.setAttribute("role", "img");
+  el.setAttribute("aria-label", item.ch + " 說文 소전");
+  return el;
+}
+
+// 소전이 있는 글자인지 (OpenCC 사전 또는 說文 원본)
+function hasSeal(ch) {
+  return !!(CUSTOM_SEAL_MAP[ch] || SEAL_MAP[ch] || SHUOWEN[ch]);
+}
 const HUNEUM_URLS = [
   "hanja.txt", // 1순위: 내 사이트 폴더 안의 파일 (인터넷 환경과 상관없이 빠르고 확실함)
   "https://cdn.jsdelivr.net/gh/libhangul/libhangul@main/data/hanja/hanja.txt", // 2순위: 빠른 CDN 서버
@@ -39,15 +87,17 @@ async function loadHuneum() {
       const text = await res.text();
       text.split("\n").forEach(line => {
         if (line.startsWith("#")) return;
-        const [, hanja, meaning] = line.split(":");
+        const [yin, hanja, meaning] = line.split(":");
         // 한 글자짜리 한자만 사용 (단어는 건너뜀)
         if (!hanja || Array.from(hanja).length !== 1 || !meaning) return;
         const m = meaning.trim();
         if (!m) return;
         if (!HUNEUM[hanja]) HUNEUM[hanja] = [];
         if (!HUNEUM[hanja].includes(m)) HUNEUM[hanja].push(m);
+        if (yin && yin.trim()) addYin(yin.trim(), hanja); // 음으로 찾기용 목록
       });
       convert(); // 사전을 다 불러오면 화면을 다시 그림
+      searchYin();
       return;
     } catch (e) { /* 다음 주소로 시도 */ }
   }
@@ -57,7 +107,9 @@ async function loadHuneum() {
 // 한 글자의 훈음 글자 만들기 (여러 개면 앞의 2개만)
 function huneumOf(ch) {
   const list = HUNEUM[ch];
-  return list ? list.slice(0, 2).join(", ") : "";
+  if (list) return list.slice(0, 2).join(", ");
+  // hanja.txt에 없으면 Unihan 보충 음만이라도 보여줌 (shuowen.js 의 EXTRA_YIN)
+  return (typeof EXTRA_YIN !== "undefined" && EXTRA_YIN[ch]) || "";
 }
 
 // ===== 소전 그림(SVG) 연결 =====
@@ -127,12 +179,18 @@ function convert() {
     
     // 1순위: 내가 직접 추가한 사전(CUSTOM_SEAL_MAP)에서 찾기
     // 2순위: 없으면 기본 OpenCC 사전(SEAL_MAP)에서 찾기
+    // 3순위: 그래도 없으면 說文 원본 그림(SHUOWEN) 사용
     const codes = CUSTOM_SEAL_MAP[ch] || SEAL_MAP[ch];
+    const sw = SHUOWEN[ch];
 
     if (codes) {
       const seal = codeToChar(codes[0]); // 여러 개면 첫 번째 사용
       span.appendChild(makeSealImage(codes[0])); // 그림으로 보여주기
       resultText += seal;
+      found++; total++;
+    } else if (sw) {
+      span.appendChild(makeShuowenImage(sw[0]));
+      resultText += ch;                   // 說文 그림은 글자 코드가 없어 원래 글자로 복사
       found++; total++;
     } else {
       span.textContent = ch;          // 대응이 없으면 원래 글자 그대로
@@ -145,14 +203,30 @@ function convert() {
     if (!ch.trim() || shown.has(ch)) return;
     shown.add(ch);
     const box = document.createElement("div");
-    box.className = "pair" + (codes ? "" : " none");
+    box.className = "pair" + (codes || sw ? "" : " none");
     box.innerHTML = codes
       ? `<div class="k">${ch}</div><div class="hun">${huneumOf(ch)}</div><div class="s"></div><div class="cp">${codes.join(", ")}</div>`
-      : `<div class="k">${ch}</div><div class="hun">${huneumOf(ch)}</div><div class="s">대응 없음</div><div class="cp">&nbsp;</div>`;
+      : `<div class="k">${ch}</div><div class="hun">${huneumOf(ch)}</div><div class="s">${sw ? "" : "대응 없음"}</div><div class="cp">&nbsp;</div>`;
     if (codes) {
       const s = box.querySelector(".s");
       if (codes.length > 1) s.classList.add("multi"); // 소전 모양이 여러 개면 조금 작게
       codes.forEach(c => s.appendChild(makeSealImage(c)));
+    }
+    // 說文 원본 소전 (정자 + 重文)
+    if (sw) {
+      const row = document.createElement("div");
+      row.className = "sw-row";
+      sw.forEach(item => {
+        const cell = document.createElement("div");
+        cell.className = "sw-cell";
+        cell.appendChild(makeShuowenImage(item));
+        const lab = document.createElement("div");
+        lab.className = "sw-lab";
+        lab.textContent = item.z ? (ZHONGWEN[item.z] || item.z) + (item.ch !== ch ? " " + item.ch : "") : "說文";
+        cell.appendChild(lab);
+        row.appendChild(cell);
+      });
+      box.insertBefore(row, box.querySelector(".cp"));
     }
     pairs.appendChild(box);
   });
@@ -183,6 +257,62 @@ document.getElementById("btn-clear").addEventListener("click", () => {
   convert();
   input.focus();
 });
+
+// ===== 음·훈으로 해서 찾기 =====
+// 한 글자(예: 천) → 음이 같은 한자 + 훈이 그 말인 한자(예: 내 → 川)
+// 두 글자 이상(예: 하늘) → 훈에 그 말이 들어간 한자
+const yinInput = document.getElementById("yin-input");
+const yinList = document.getElementById("yin-list");
+const yinCount = document.getElementById("yin-count");
+
+function searchYin() {
+  const q = (yinInput.value || "").trim();
+  yinList.innerHTML = "";
+  yinCount.textContent = "";
+  if (!q) return;
+  if (!/^[가-힣\s]+$/.test(q)) { yinCount.textContent = "한글로 음이나 뜻을 입력하세요. (예: 천, 하늘)"; return; }
+
+  const hits = [];
+  const add = ch => { if (hasSeal(ch) && !hits.includes(ch)) hits.push(ch); };
+  const one = Array.from(q).length === 1;
+  if (one) (YIN_INDEX[q] || []).forEach(add);
+  Object.entries(HUNEUM).forEach(([ch, list]) => {
+    list.forEach(m => m.split(",").forEach(part => {
+      const words = part.trim().split(/\s+/);
+      const hun = words.slice(0, -1).join(" ");          // "하늘 천" → "하늘"
+      if (one ? words.slice(0, -1).includes(q) : hun.includes(q)) add(ch);
+    }));
+  });
+
+  // 훈음 사전(hanja.txt)에 있는 익숙한 글자를 앞에, Unihan 보충 음만 있는 벽자는 뒤에
+  hits.sort((a, b) => (HUNEUM[a] ? 0 : 1) - (HUNEUM[b] ? 0 : 1));
+
+  if (!hits.length) {
+    yinCount.textContent = `"${q}"에 해당하는 소전 글자가 없습니다.`;
+    return;
+  }
+  yinCount.textContent = `${hits.length}자 · 글자를 누르면 아래에 소전이 나옵니다`;
+  hits.forEach(ch => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "yin-cand";
+    const hun = huneumOf(ch);
+    b.innerHTML = `<span class="yk">${ch}</span><span class="yh">${hun}</span>`;
+    b.addEventListener("click", () => {
+      input.value += ch;               // 해서 입력칸에 이어 붙임 (여러 글자를 차례로 고를 수 있음)
+      convert();
+      showToast(`${ch} 추가됨`);
+      document.getElementById("pairs").lastElementChild?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    yinList.appendChild(b);
+  });
+}
+
+yinInput.addEventListener("input", (e) => {
+  if (e.isComposing) return;
+  searchYin();
+});
+yinInput.addEventListener("compositionend", searchYin);
 
 // 처음 열었을 때 한 번 변환
 convert();
