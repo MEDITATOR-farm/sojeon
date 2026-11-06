@@ -298,15 +298,187 @@ function searchYin() {
     b.className = "yin-cand";
     const hun = huneumOf(ch);
     b.innerHTML = `<span class="yk">${ch}</span><span class="yh">${hun}</span>`;
-    b.addEventListener("click", () => {
-      input.value += ch;               // 해서 입력칸에 이어 붙임 (여러 글자를 차례로 고를 수 있음)
-      convert();
-      showToast(`${ch} 추가됨`);
-      document.getElementById("pairs").lastElementChild?.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
+    b.addEventListener("click", () => pickChar(ch));
     yinList.appendChild(b);
   });
 }
+
+// 찾은 글자를 고르면: 해서 입력칸에 이어 붙이고(여러 글자를 차례로 고를 수 있음) 바로 소전으로 변환
+function pickChar(ch) {
+  input.value += ch;
+  convert();
+  showToast(`${ch} 추가됨`);
+  document.getElementById("pairs").lastElementChild?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+// ===== 부수·획수로 찾기 =====
+// bushou.js 의 RADICALS(214부)와 RS_CHARS([글자, 부수번호, 나머지 획수, 총획수])를 사용
+const rsRadicals = document.getElementById("rs-radicals");
+const rsStrokes = document.getElementById("rs-strokes");
+const rsPicked = document.getElementById("rs-picked");
+const rsList = document.getElementById("rs-list");
+const rsCount = document.getElementById("rs-count");
+const RS_BY_RAD = {};   // 부수 번호 → 글자 목록
+const RS_BY_TOTAL = {}; // 총획수 → 글자 목록
+if (typeof RS_CHARS !== "undefined") {
+  RS_CHARS.forEach(([ch, rad, rest, total]) => {
+    const item = { ch, rad, rest, total };
+    (RS_BY_RAD[rad] = RS_BY_RAD[rad] || []).push(item);
+    (RS_BY_TOTAL[total] = RS_BY_TOTAL[total] || []).push(item);
+  });
+}
+let rsMode = "rad";
+
+// 화면에 보일 때만 소전 그림을 불러옴 (글자가 수백 개여도 데이터를 아끼고 느려지지 않게)
+const rsObserver = "IntersectionObserver" in window
+  ? new IntersectionObserver((entries) => entries.forEach((en) => {
+      if (!en.isIntersecting) return;
+      fillThumb(en.target);
+      rsObserver.unobserve(en.target);
+    }), { rootMargin: "200px" })
+  : null;
+function fillThumb(box) {
+  const ch = box.dataset.ch;
+  const codes = CUSTOM_SEAL_MAP[ch] || SEAL_MAP[ch];
+  if (SHUOWEN[ch]) box.appendChild(makeShuowenImage(SHUOWEN[ch][0]));
+  else if (codes) box.appendChild(makeSealImage(codes[0]));
+}
+
+// 결과 목록에 글자 버튼 하나 만들기: 소전 그림 + 해서 + 음
+function rsButton(item) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "rs-cand";
+  const thumb = document.createElement("span");
+  thumb.className = "rs-thumb";
+  thumb.dataset.ch = item.ch;
+  b.appendChild(thumb);
+  const yin = (huneumOf(item.ch).split(",")[0] || "").trim();
+  b.insertAdjacentHTML("beforeend", `<span class="rk">${item.ch}</span><span class="ry">${yin || "&nbsp;"}</span>`);
+  b.addEventListener("click", () => pickChar(item.ch));
+  if (rsObserver) rsObserver.observe(thumb); else fillThumb(thumb);
+  return b;
+}
+
+// 글자 묶음을 제목과 함께 목록에 넣기 (익숙한 글자 먼저)
+function rsGroup(title, items, dim) {
+  if (!items.length) return;
+  const h = document.createElement("div");
+  h.className = "rs-head" + (dim ? " dim" : "");
+  h.textContent = `${title} · ${items.length}자`;
+  rsList.appendChild(h);
+  const g = document.createElement("div");
+  g.className = "rs-grid" + (dim ? " dim" : "");
+  items.slice().sort((a, b) => (HUNEUM[a.ch] ? 0 : 1) - (HUNEUM[b.ch] ? 0 : 1))
+    .forEach((it) => g.appendChild(rsButton(it)));
+  rsList.appendChild(g);
+}
+
+function rsClear() {
+  rsStrokes.innerHTML = ""; rsList.innerHTML = ""; rsCount.textContent = ""; rsPicked.innerHTML = "";
+}
+
+// 1단계: 부수 고르기 (부수 획수별로 묶어서 보여줌)
+function rsShowRadicals() {
+  rsClear();
+  rsRadicals.innerHTML = "";
+  rsRadicals.hidden = false;
+  let cur = 0, row = null;
+  RADICALS.forEach(([n, ch, st, variant, count]) => {
+    if (st !== cur) {
+      cur = st;
+      const lab = document.createElement("div");
+      lab.className = "rs-stlabel";
+      lab.textContent = `${st}획`;
+      rsRadicals.appendChild(lab);
+      row = document.createElement("div");
+      row.className = "rs-row";
+      rsRadicals.appendChild(row);
+    }
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "rs-rad";
+    b.title = `${n}번 부수 · 소전 ${count}자`;
+    b.innerHTML = `${ch}${variant ? `<small>${variant}</small>` : ""}`;
+    b.addEventListener("click", () => rsPickRadical(n));
+    row.appendChild(b);
+  });
+  rsCount.textContent = "글자의 부수를 고르세요. 작은 글씨는 흔히 쓰는 변형(예: 水 → 氵)입니다.";
+}
+
+// 2단계: 부수를 고르면 나머지 획수 버튼을 보여줌
+function rsPickRadical(n) {
+  const [, ch, , variant] = RADICALS[n - 1];
+  const items = RS_BY_RAD[n] || [];
+  rsRadicals.hidden = true;
+  rsClear();
+  rsPicked.innerHTML = `<span class="rs-chip">${ch}${variant ? " " + variant : ""} 부</span>`;
+  const back = document.createElement("button");
+  back.type = "button"; back.className = "btn rs-back"; back.textContent = "부수 다시 고르기";
+  back.addEventListener("click", rsShowRadicals);
+  rsPicked.appendChild(back);
+
+  const rests = [...new Set(items.map((i) => i.rest))].sort((a, b) => a - b);
+  const all = document.createElement("button");
+  all.type = "button"; all.className = "rs-st"; all.textContent = "전체";
+  all.addEventListener("click", () => rsShowRest(n, null, all));
+  rsStrokes.appendChild(all);
+  rests.forEach((r) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "rs-st"; b.textContent = r;
+    b.addEventListener("click", () => rsShowRest(n, r, b));
+    rsStrokes.appendChild(b);
+  });
+  rsCount.textContent = `부수를 뺀 나머지 획수를 고르세요 (소전 ${items.length}자)`;
+}
+
+// 3단계: 고른 획수의 글자 + 한 획 차이(±1) 글자를 함께 보여줌
+function rsShowRest(n, r, btn) {
+  rsStrokes.querySelectorAll(".rs-st").forEach((b) => b.classList.toggle("on", b === btn));
+  rsList.innerHTML = "";
+  const items = RS_BY_RAD[n] || [];
+  if (r === null) {
+    const rests = [...new Set(items.map((i) => i.rest))].sort((a, b) => a - b);
+    rests.forEach((x) => rsGroup(`나머지 ${x}획`, items.filter((i) => i.rest === x)));
+    rsCount.textContent = `${items.length}자`;
+    return;
+  }
+  const exact = items.filter((i) => i.rest === r);
+  rsGroup(`나머지 ${r}획`, exact);
+  rsGroup(`한 획 적게 (${r - 1}획)`, items.filter((i) => i.rest === r - 1), true);
+  rsGroup(`한 획 많게 (${r + 1}획)`, items.filter((i) => i.rest === r + 1), true);
+  rsCount.textContent = `${exact.length}자 · 획수를 다르게 세는 경우를 위해 한 획 차이 글자도 아래에 함께 보여줍니다`;
+}
+
+// 총획수로 찾기
+function rsShowTotals() {
+  rsClear();
+  rsRadicals.hidden = true;
+  const totals = Object.keys(RS_BY_TOTAL).map(Number).sort((a, b) => a - b);
+  totals.forEach((t) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "rs-st"; b.textContent = t;
+    b.title = `${RS_BY_TOTAL[t].length}자`;
+    b.addEventListener("click", () => {
+      rsStrokes.querySelectorAll(".rs-st").forEach((x) => x.classList.toggle("on", x === b));
+      rsList.innerHTML = "";
+      rsGroup(`총 ${t}획`, RS_BY_TOTAL[t]);
+      rsCount.textContent = `${RS_BY_TOTAL[t].length}자 · 글자가 많으면 부수로 찾는 편이 빠릅니다`;
+    });
+    rsStrokes.appendChild(b);
+  });
+  rsCount.textContent = "총획수를 고르세요";
+}
+
+document.querySelectorAll(".rs-tab").forEach((tab) => tab.addEventListener("click", () => {
+  rsMode = tab.dataset.mode;
+  document.querySelectorAll(".rs-tab").forEach((t) => t.classList.toggle("on", t === tab));
+  if (rsMode === "rad") rsShowRadicals(); else rsShowTotals();
+}));
+// 처음 펼칠 때 부수 목록을 그림
+document.getElementById("rs-box").addEventListener("toggle", (e) => {
+  if (e.target.open && !rsRadicals.children.length && rsMode === "rad") rsShowRadicals();
+});
 
 yinInput.addEventListener("input", (e) => {
   if (e.isComposing) return;

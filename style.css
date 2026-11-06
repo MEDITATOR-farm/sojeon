@@ -180,6 +180,56 @@ input[type="text"].yin-input::placeholder { color: var(--muted); opacity: .6; fo
 .yin-cand .yk { font-family: "Noto Serif TC", serif; font-size: 1.9rem; line-height: 1.2; }
 .yin-cand .yh { font-size: .72rem; color: var(--muted); word-break: keep-all; line-height: 1.3; }
 
+/* ===== 부수·획수로 찾기 ===== */
+.rs-box { width: 100%; }
+.rs-box > summary { cursor: pointer; list-style: none; margin-bottom: 0; }
+.rs-box > summary::-webkit-details-marker { display: none; }
+.rs-box > summary::after { content: " ▾"; color: var(--muted); }
+.rs-box[open] > summary { margin-bottom: 12px; }
+.rs-box[open] > summary::after { content: " ▴"; }
+.rs-sub { font-weight: 400; font-size: .8rem; color: var(--muted); margin-left: 4px; }
+.rs-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+.rs-tab { padding: 10px 6px; }
+.rs-tab.on { border-color: var(--gold); color: var(--gold); background: rgba(217,178,111,.1); }
+.rs-radicals { width: 100%; margin-top: 10px; max-height: 420px; overflow-y: auto; text-align: left; }
+.rs-stlabel { font-size: .75rem; color: var(--gold); margin: 10px 2px 4px; }
+.rs-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.rs-rad {
+  min-width: 46px; height: 46px; padding: 0 6px; font-family: "Noto Serif TC", serif; font-size: 1.4rem;
+  color: var(--ink); background: rgba(0,0,0,.25); border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 2px;
+}
+.rs-rad small { font-size: .75rem; color: var(--muted); }
+.rs-rad:active { border-color: var(--gold); transform: scale(.95); }
+@media (hover: hover) { .rs-rad:hover, .rs-st:hover, .rs-cand:hover { border-color: var(--gold); } }
+.rs-picked { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; width: 100%; }
+.rs-picked:not(:empty) { margin-top: 12px; }
+.rs-chip { font-family: "Noto Serif TC", serif; font-size: 1.6rem; color: var(--gold); }
+.rs-back { padding: 8px 14px; font-size: .85rem; }
+.rs-strokes { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: 100%; }
+.rs-strokes:not(:empty) { margin-top: 12px; }
+.rs-st {
+  min-width: 40px; height: 38px; padding: 0 8px; font: inherit; color: var(--ink); cursor: pointer;
+  background: rgba(0,0,0,.25); border: 1px solid var(--line); border-radius: 8px;
+}
+.rs-st.on { border-color: var(--gold); color: var(--gold); background: rgba(217,178,111,.12); }
+.rs-list { width: 100%; }
+.rs-head { font-size: .8rem; color: var(--gold); text-align: left; margin: 14px 2px 6px; }
+.rs-head.dim { color: var(--muted); }
+.rs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; }
+.rs-grid.dim { opacity: .75; }
+.rs-cand {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px 6px;
+  font: inherit; color: var(--ink); cursor: pointer;
+  background: rgba(0,0,0,.25); border: 1px solid var(--line); border-radius: 10px;
+}
+.rs-cand:active { transform: scale(.96); border-color: var(--gold); }
+.rs-thumb { width: 44px; height: 44px; font-size: 40px; display: flex; align-items: center; justify-content: center; }
+.rs-thumb .sw-glyph { --sz: 40px; }
+.rs-thumb .glyph { width: 40px; height: 40px; }
+.rs-cand .rk { font-family: "Noto Serif TC", serif; font-size: 1.2rem; line-height: 1.2; }
+.rs-cand .ry { font-size: .7rem; color: var(--muted); }
+
 /* ===== 說文 원본 소전 그림 (원본 쪽 그림 한 장에서 10칸씩 잘라 보여줌) ===== */
 .sw-glyph {
   --x: 0; --y: 0; --sz: 1.1em;
