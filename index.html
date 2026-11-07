@@ -36,6 +36,29 @@
     </section>
 
     <section class="card">
+      <details id="ph-box" class="rs-box">
+        <summary class="label">사진으로 찾기 <span class="rs-sub">책·자료를 찍어서</span></summary>
+        <div class="buttons ph-buttons">
+          <label class="btn primary ph-pick">📷 사진 찍기<input type="file" id="ph-camera" accept="image/*" capture="environment" hidden></label>
+          <label class="btn ph-pick">🖼 사진 고르기<input type="file" id="ph-file" accept="image/*" hidden></label>
+        </div>
+        <label class="ph-opt"><input type="checkbox" id="ph-big" checked> 큰 글자(표제자)만 읽기</label>
+        <div id="ph-code-row" class="ph-code-row" hidden>
+          <input type="password" id="ph-code" class="ph-code" placeholder="사진 읽기 비밀번호" autocomplete="off">
+          <button type="button" id="ph-code-save" class="btn">저장</button>
+        </div>
+        <img id="ph-preview" class="ph-preview" alt="올린 사진" hidden>
+        <p id="ph-status" class="hint">사진을 찍으면 AI가 한자를 읽어 줍니다. 틀린 글자는 눌러서 고칠 수 있습니다.</p>
+        <div id="ph-result" class="ph-result"></div>
+        <div id="ph-edit" class="ph-edit" hidden></div>
+        <div class="buttons ph-buttons" id="ph-actions" hidden>
+          <button type="button" id="ph-apply" class="btn primary">모두 소전으로 변환</button>
+          <button type="button" id="ph-reset" class="btn">다시 하기</button>
+        </div>
+      </details>
+    </section>
+
+    <section class="card">
       <details id="hw-box" class="rs-box">
         <summary class="label">손글씨로 찾기 <span class="rs-sub">손가락으로 그려서</span></summary>
         <div class="hw-wrap"><canvas id="hw-canvas" class="hw-canvas" aria-label="한자를 손으로 쓰는 칸"></canvas></div>

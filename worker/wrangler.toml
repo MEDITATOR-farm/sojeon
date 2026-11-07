@@ -1,0 +1,11 @@
+# Cloudflare Worker 설정 (명령줄 wrangler로 올릴 때만 필요. 대시보드에 붙여넣는 방법을 쓰면 필요 없음)
+name = "sojeon-ocr"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+ALLOWED_ORIGIN = "https://meditator-farm.github.io"
+MODEL = "claude-sonnet-5-5"
+# 비밀 값은 여기 적지 말고 명령으로 넣으세요:
+#   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler secret put ACCESS_CODE

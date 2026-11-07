@@ -305,11 +305,194 @@ function searchYin() {
 
 // 찾은 글자를 고르면: 해서 입력칸에 이어 붙이고(여러 글자를 차례로 고를 수 있음) 바로 소전으로 변환
 function pickChar(ch) {
+  if (phEditing !== null) { phReplace(ch); return; } // 사진에서 읽은 글자를 고치는 중이면 그 자리에 넣음
   input.value += ch;
   convert();
   showToast(`${ch} 추가됨`);
   document.getElementById("pairs").lastElementChild?.scrollIntoView({ behavior: "smooth", block: "center" });
 }
+
+// ===== 사진으로 찾기 =====
+// 사진을 줄여서 중계 서버(Cloudflare Worker)로 보내면, 서버가 Claude API로 한자를 읽어 돌려줌.
+// API 키는 서버에만 있고, 이 앱은 서버 주소와 비밀번호만 알고 있음. (설명: worker/README.md)
+const PHOTO_API = ""; // ← Cloudflare Worker 주소를 넣으세요. 예: "https://sojeon-ocr.계정이름.workers.dev"
+const PH_MAX_SIDE = 1600;   // 사진 긴 쪽을 이 크기로 줄여서 보냄 (글자는 충분히 보이고 요금·시간은 줄어듦)
+const phStatus = document.getElementById("ph-status");
+const phResult = document.getElementById("ph-result");
+const phEdit = document.getElementById("ph-edit");
+const phPreview = document.getElementById("ph-preview");
+const phActions = document.getElementById("ph-actions");
+const phCodeRow = document.getElementById("ph-code-row");
+let phChars = [];       // 읽은 글자: [{c, sure, alt, note, col}]
+let phEditing = null;   // 지금 고치고 있는 글자 번호 (없으면 null)
+let phPendingFile = null;
+
+function phGetCode() { try { return localStorage.getItem("sojeon-photo-code") || ""; } catch (e) { return ""; } }
+function phSetCode(v) { try { localStorage.setItem("sojeon-photo-code", v); } catch (e) {} }
+
+// 사진을 긴 쪽 1600px JPEG로 줄이기
+function phShrink(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, PH_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.naturalWidth * k);
+      c.height = Math.round(img.naturalHeight * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      const dataUrl = c.toDataURL("image/jpeg", 0.88);
+      resolve({ dataUrl, base64: dataUrl.split(",")[1] });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("사진을 열 수 없습니다")); };
+    img.src = url;
+  });
+}
+
+async function phRead(file) {
+  if (!PHOTO_API) {
+    phStatus.textContent = "사진 읽기 서버가 아직 연결되지 않았습니다. (script.js의 PHOTO_API에 서버 주소를 넣어야 합니다)";
+    return;
+  }
+  const code = phGetCode();
+  if (!code) { phPendingFile = file; phCodeRow.hidden = false; phStatus.textContent = "처음 한 번만 사진 읽기 비밀번호를 입력해 주세요."; return; }
+  phCodeRow.hidden = true;
+  phResult.innerHTML = ""; phEdit.hidden = true; phActions.hidden = true; phEditing = null;
+  phStatus.textContent = "사진을 줄이는 중…";
+  let shrunk;
+  try { shrunk = await phShrink(file); } catch (e) { phStatus.textContent = e.message; return; }
+  phPreview.src = shrunk.dataUrl; phPreview.hidden = false;
+  phStatus.textContent = "AI가 한자를 읽는 중… (10~30초 걸릴 수 있습니다)";
+  let data;
+  try {
+    const res = await fetch(PHOTO_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Access-Code": code },
+      body: JSON.stringify({ image: shrunk.base64, mediaType: "image/jpeg", mode: document.getElementById("ph-big").checked ? "big" : "all" }),
+    });
+    data = await res.json();
+    if (!res.ok) {
+      if (data.code === "bad_code") { phSetCode(""); phPendingFile = file; phCodeRow.hidden = false; }
+      phStatus.textContent = "읽지 못했습니다: " + (data.error || res.status);
+      return;
+    }
+  } catch (e) {
+    phStatus.textContent = "서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.";
+    return;
+  }
+  phChars = [];
+  data.columns.forEach((col, ci) => col.forEach((x) => phChars.push({ ...x, col: ci })));
+  phRender();
+}
+
+// 읽은 글자 목록 그리기: 확실하지 않은 글자는 빨간 테두리
+function phRender() {
+  phResult.innerHTML = "";
+  if (!phChars.length) { phStatus.textContent = "사진에서 한자를 찾지 못했습니다. 더 밝고 가깝게 찍어 보세요."; return; }
+  const unsure = phChars.filter((x) => !x.sure).length;
+  phStatus.textContent = `${phChars.length}자를 읽었습니다` +
+    (unsure ? ` · 빨간 테두리 ${unsure}자는 확실하지 않으니 사진과 비교해 확인해 주세요` : "") +
+    " · 글자를 누르면 고칠 수 있습니다";
+  let lastCol = -1, grid = null;
+  phChars.forEach((x, i) => {
+    if (x.col !== lastCol) {
+      lastCol = x.col;
+      const h = document.createElement("div");
+      h.className = "rs-head";
+      h.textContent = `${x.col + 1}째 줄`;
+      phResult.appendChild(h);
+      grid = document.createElement("div");
+      grid.className = "rs-grid";
+      phResult.appendChild(grid);
+    }
+    const b = x.c === "?" ? document.createElement("button") : rsButton({ ch: x.c });
+    if (x.c === "?") {
+      b.type = "button"; b.className = "rs-cand";
+      b.innerHTML = `<span class="rs-thumb">?</span><span class="rk">?</span><span class="ry">${x.note || "못 읽음"}</span>`;
+    }
+    b.classList.add("ph-cand");
+    if (!x.sure || x.c === "?") b.classList.add("unsure");
+    if (!hasSeal(x.c) && x.c !== "?") b.classList.add("noseal");
+    if (i === phEditing) b.classList.add("editing");
+    // rsButton이 붙인 '바로 넣기' 대신 '고치기'로 동작하게 바꿈
+    const nb = b.cloneNode(true);
+    nb.addEventListener("click", () => phStartEdit(i));
+    grid.appendChild(nb);
+    nb.querySelectorAll(".rs-thumb").forEach((t) => { if (!t.children.length && t.dataset.ch) fillThumb(t); });
+  });
+  phActions.hidden = false;
+}
+
+// 글자 하나 고치기: 다른 후보 / 직접 입력 / 위의 찾기 기능으로 고르기 / 지우기
+function phStartEdit(i) {
+  phEditing = i;
+  const x = phChars[i];
+  phEdit.hidden = false;
+  phEdit.innerHTML = `<div class="ph-edit-title"><b>${x.c}</b> 고치기${x.note ? ` <span class="rs-sub">(${x.note})</span>` : ""}</div>`;
+  if (x.alt && x.alt.length) {
+    const row = document.createElement("div");
+    row.className = "ph-alt";
+    row.insertAdjacentHTML("beforeend", '<span class="rs-sub">다른 후보</span>');
+    x.alt.forEach((a) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "rs-st"; b.textContent = a;
+      b.addEventListener("click", () => phReplace(a));
+      row.appendChild(b);
+    });
+    phEdit.appendChild(row);
+  }
+  const row2 = document.createElement("div");
+  row2.className = "ph-alt";
+  row2.innerHTML = '<input type="text" class="ph-type" maxlength="2" placeholder="직접"><button type="button" class="rs-st ph-ok">바꾸기</button>' +
+    '<button type="button" class="rs-st ph-del">지우기</button><button type="button" class="rs-st ph-ok-sure">맞음</button><button type="button" class="rs-st ph-cancel">닫기</button>';
+  row2.querySelector(".ph-ok").addEventListener("click", () => {
+    const v = Array.from(row2.querySelector(".ph-type").value.trim())[0];
+    if (v) phReplace(v);
+  });
+  row2.querySelector(".ph-del").addEventListener("click", () => { phChars.splice(i, 1); phStopEdit(); });
+  row2.querySelector(".ph-ok-sure").addEventListener("click", () => { phChars[i].sure = true; phStopEdit(); });
+  row2.querySelector(".ph-cancel").addEventListener("click", phStopEdit);
+  phEdit.appendChild(row2);
+  phEdit.insertAdjacentHTML("beforeend",
+    '<p class="hint">글자를 모르면 위의 <b>음·훈</b>, 아래의 <b>손글씨</b>·<b>부수·획수</b> 찾기에서 고르세요. 고른 글자가 이 자리에 들어갑니다.</p>');
+  phRender();
+}
+function phReplace(ch) {
+  if (phEditing === null) return;
+  phChars[phEditing].c = ch;
+  phChars[phEditing].sure = true;
+  showToast(`${ch}(으)로 고침`);
+  phStopEdit();
+  document.getElementById("ph-box").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function phStopEdit() { phEditing = null; phEdit.hidden = true; phEdit.innerHTML = ""; phRender(); }
+
+document.getElementById("ph-apply").addEventListener("click", () => {
+  const text = phChars.map((x) => x.c).filter((c) => c !== "?").join("");
+  if (!text) return;
+  phStopEdit();
+  input.value = text;
+  convert();
+  document.getElementById("output").scrollIntoView({ behavior: "smooth", block: "start" });
+});
+document.getElementById("ph-reset").addEventListener("click", () => {
+  phChars = []; phStopEdit(); phResult.innerHTML = ""; phActions.hidden = true; phPreview.hidden = true;
+  phStatus.textContent = "사진을 찍으면 AI가 한자를 읽어 줍니다. 틀린 글자는 눌러서 고칠 수 있습니다.";
+});
+["ph-camera", "ph-file"].forEach((id) => document.getElementById(id).addEventListener("change", (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (f) phRead(f);
+}));
+document.getElementById("ph-code-save").addEventListener("click", () => {
+  const v = document.getElementById("ph-code").value.trim();
+  if (!v) return;
+  phSetCode(v);
+  document.getElementById("ph-code").value = "";
+  phCodeRow.hidden = true;
+  if (phPendingFile) { const f = phPendingFile; phPendingFile = null; phRead(f); }
+});
 
 // ===== 부수·획수로 찾기 =====
 // bushou.js 의 RADICALS(214부)와 RS_CHARS([글자, 부수번호, 나머지 획수, 총획수])를 사용
