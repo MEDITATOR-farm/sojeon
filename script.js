@@ -315,7 +315,7 @@ function pickChar(ch) {
 // ===== 사진으로 찾기 =====
 // 사진을 줄여서 중계 서버(Cloudflare Worker)로 보내면, 서버가 Claude API로 한자를 읽어 돌려줌.
 // API 키는 서버에만 있고, 이 앱은 서버 주소와 비밀번호만 알고 있음. (설명: worker/README.md)
-const PHOTO_API = ""; // ← Cloudflare Worker 주소를 넣으세요. 예: "https://sojeon-ocr.계정이름.workers.dev"
+const PHOTO_API = "https://sojeon-ocr.humminfarm.workers.dev"; // 사진 읽기 중계 서버 (Cloudflare Worker, 설명: worker/README.md)
 const PH_MAX_SIDE = 1600;   // 사진 긴 쪽을 이 크기로 줄여서 보냄 (글자는 충분히 보이고 요금·시간은 줄어듦)
 const phStatus = document.getElementById("ph-status");
 const phResult = document.getElementById("ph-result");
