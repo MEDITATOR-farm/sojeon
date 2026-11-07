@@ -285,6 +285,51 @@ input[type="text"].ph-type { width: 80px; height: 38px; padding: 0; margin: 0; t
 .sw-cell .sw-glyph { --sz: 3rem; }
 .sw-lab { font-size: .7rem; color: var(--muted); margin-top: 2px; font-family: "Noto Serif TC", serif; }
 
+
+/* ===== 글자 풀이 · 기초자 · 540부수 분해표 (bunhae.js) ===== */
+.pair { cursor: pointer; }
+.bh-body { width: 100%; display: grid; gap: 12px; text-align: left; }
+.bh-body:empty { display: none; }
+.bh-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.bh-big { width: 96px; height: 96px; font-size: 84px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 10px; background: rgba(0,0,0,.25); }
+.bh-big .sw-glyph { --sz: 84px; }
+.bh-big .glyph { width: 84px; height: 84px; }
+.bh-ch { font-family: "Noto Serif TC", serif; font-size: 2rem; line-height: 1.1; }
+.bh-hun { color: var(--muted); font-size: .9rem; }
+.bh-nav { margin-left: auto; display: flex; gap: 6px; }
+.bh-step { border: 1px solid var(--line); border-radius: 10px; background: rgba(0,0,0,.18); }
+.bh-step > summary { cursor: pointer; padding: 10px 14px; color: var(--gold); font-size: .95rem; list-style: none; }
+.bh-step > summary::-webkit-details-marker { display: none; }
+.bh-step > summary::before { content: "▸ "; }
+.bh-step[open] > summary::before { content: "▾ "; }
+.bh-step-body { padding: 0 14px 14px; display: grid; gap: 10px; min-width: 0; }
+.bh-shuo { font-family: "Noto Serif TC", serif; font-size: 1.05rem; line-height: 1.8; margin: 0; }
+.bh-say { margin: 0; line-height: 1.75; font-size: .95rem; }
+.bh-src, .bh-note { font-size: .75rem; color: var(--muted); }
+.bh-h4 { color: var(--gold); font-size: .85rem; margin-top: 4px; }
+.bh-kw { display: flex; flex-wrap: wrap; gap: 6px; }
+.bh-kw span { font-size: .85rem; padding: 2px 10px; border-radius: 999px; background: rgba(217,178,111,.15); border: 1px solid rgba(217,178,111,.35); }
+.bh-vtitle { display: block; max-width: 100%; height: auto; border-radius: 6px; }
+.bh-decimg { display: block; max-width: 200px; height: auto; border-radius: 6px; }
+.bh-basic { display: grid; gap: 8px; }
+.bh-tree, .bh-tree ul { list-style: none; margin: 0; padding: 0; min-width: 0; }
+.bh-tree ul { margin-left: 18px; padding-left: 12px; border-left: 1px dashed var(--line); }
+.bh-tree li { margin: 8px 0; min-width: 0; }
+.bh-node { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bh-sb { width: 52px; height: 52px; font-size: 44px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: rgba(0,0,0,.25); flex: none; }
+.bh-sb .sw-glyph { --sz: 44px; }
+.bh-sb .glyph { width: 44px; height: 44px; }
+.bh-nc { font-family: "Noto Serif TC", serif; font-size: 1.4rem; }
+.bh-tag { font-size: .72rem; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.bh-tag.sheng { border-color: var(--gold); color: var(--gold); }
+.bh-rbtn { height: auto; padding: 4px 10px; font-size: .8rem; }
+.bh-chart { margin: 8px 0 0; min-width: 0; }
+.bh-chart-scroll { overflow-x: auto; background: #f4f0e8; border-radius: 8px; padding: 6px; }
+.bh-crop { width: 100%; min-width: 520px; background-repeat: no-repeat; background-size: 100% auto; }
+.bh-chart figcaption { font-size: .72rem; color: var(--muted); margin-top: 4px; text-align: right; }
+.bh-grid { margin-top: 12px; }
+input[type="text"].bh-q { height: 48px; font-size: 1.1rem; margin-bottom: 10px; }
+
 /* 알림 */
 .toast {
   position: fixed; left: 50%; bottom: 30px; transform: translate(-50%, 20px);

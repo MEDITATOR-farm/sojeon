@@ -104,12 +104,39 @@
     </section>
 
     <section class="card">
-      <div class="label">글자별 대응표</div>
+      <div class="label">글자별 대응표 <span class="rs-sub">글자를 누르면 풀이가 나옵니다</span></div>
       <div id="pairs" class="pairs"></div>
+    </section>
+
+    <!-- 글자 풀이: 대응표에서 글자를 누르면 說文 원문 → 기초자 설명 → 자형 분해 순으로 이어서 보여줌 -->
+    <section class="card bh-card" id="bh-card" hidden>
+      <div class="label">글자 풀이</div>
+      <div id="bh-body" class="bh-body"></div>
+    </section>
+
+    <section class="card">
+      <details id="bh-basics" class="rs-box">
+        <summary class="label">기초자 <span class="rs-sub">자형과 뜻 — 한자해례</span></summary>
+        <div id="bh-bdetail" class="bh-body"></div>
+        <div id="bh-bgrid" class="rs-grid bh-grid"></div>
+      </details>
+    </section>
+
+    <section class="card">
+      <details id="bh-rad" class="rs-box">
+        <summary class="label">說文 540부수 자형 분해표 <span class="rs-sub">최규화</span></summary>
+        <input type="text" id="bh-q" class="bh-q" placeholder="번호, 부수, 권 (예: 125, 水, 5上)" autocomplete="off">
+        <div id="bh-rdetail" class="bh-body"></div>
+        <div id="bh-rgrid" class="rs-grid bh-grid"></div>
+      </details>
     </section>
   </main>
 
   <footer class="credits">
+    <p><b>540부수 자형 분해표</b>: 최규화 著, 『설문해자 540부수의 자형 분해』, 도서출판 한자해례, ISBN 979-11-979362-7-2 ·
+      <b>기초자</b>: 「[한자해례1800+] 기초자81」, <a href="https://www.youtube.com/watch?v=OjKvkfoToC4" target="_blank" rel="noopener">한자해례 채널</a>(최규화), 2023 ·
+      저자의 허락을 받아 게시합니다. 저작권은 저자에게 있으며 무단 전재·발췌를 금합니다.</p>
+    <p><b>說文 원문·구성</b>: <a href="https://github.com/shuowenjiezi/shuowen" target="_blank" rel="noopener">shuowen.org 說文解字 데이터</a> (Apache 2.0)</p>
     <p><b>說文 소전 그림</b>: 崇羲篆體字形表(《說文解字》) · 王心怡、季旭昇 · 中央研究院 小學堂 ·
       <a href="https://creativecommons.org/licenses/by-nd/3.0/tw/" target="_blank" rel="noopener">CC BY-ND 3.0 TW</a></p>
     <p><b>소전 그림(SVG)</b>: <a href="https://github.com/frankslin/kaiyuan-small-seal-font" target="_blank" rel="noopener">開元小篆</a> (OFL 1.1) ·
@@ -126,6 +153,8 @@
   <script src="data.js"></script>
   <script src="shuowen.js"></script>
   <script src="bushou.js"></script>
+  <script src="bunhae/data.js"></script>
   <script src="script.js"></script>
+  <script src="bunhae.js"></script>
 </body>
 </html>

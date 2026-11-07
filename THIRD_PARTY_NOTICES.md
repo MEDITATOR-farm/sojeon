@@ -11,6 +11,9 @@
 | 4. libhangul 한자 사전 | `hanja.txt` | BSD 3-Clause |
 | 5. HanziLookupJS 손글씨 인식 | `hwr/` | GNU GPL v3 / Arphic Public License |
 | 6. Noto Serif KR·TC 글꼴 | Google Fonts에서 불러옴 (저장소에 없음) | SIL Open Font License 1.1 |
+| 7. 최규화 『설문해자 540부수의 자형 분해』 | `bunhae/s/`, `bunhae/data.js` | 저작권은 저자에게 있음 — 저자의 허락을 받아 게시 |
+| 8. 한자해례 채널 「기초자81」 영상 | `bunhae/k/`, `bunhae/data.js` | 저작권은 저자에게 있음 — 저자의 허락을 받아 게시 |
+| 9. shuowen.org 說文解字 데이터 | `bunhae/shuowen-text.js` | Apache License 2.0 |
 | 이 사이트의 코드 | `index.html`, `script.js`, `style.css`, `sw.js` 등 | GNU GPL v3 (`LICENSE`) |
 
 ---
@@ -133,12 +136,31 @@ POSSIBILITY OF SUCH DAMAGE.
 Google Fonts(<https://fonts.google.com/>)에서 불러와 쓰며, 저장소에 복사해 두지는 않습니다.
 SIL Open Font License 1.1.
 
+## 7. 최규화, 『설문해자 540부수의 자형 분해』
+
+- 저자: 최규화 · 발행: 도서출판 한자해례 · ISBN 979-11-979362-7-2 · 저본: 〔漢〕許慎《說文解字》(中華書局, 1985, 平津館叢書本 影印)
+- `bunhae/s/00.webp` ~ `14.webp`는 책의 540부수 분해표를 쪽에서 잘라 이어 붙인 그림입니다. 내용은 고치지 않았습니다.
+- **저작권은 저자에게 있으며, 저자의 허락을 받아 이 사이트에 게시합니다. 이 저장소의 GPL v3 라이선스는 이 자료에 적용되지 않습니다.**
+  허락 없이 내용 일부를 인용하거나 발췌하는 것을 금합니다(책 판권면).
+
+## 8. 한자해례 채널 「[한자해례1800+] 기초자81 (압축 버전, 20분)」
+
+- 최규화, 2023-10-14, <https://www.youtube.com/watch?v=OjKvkfoToC4>
+- `bunhae/k/`의 그림은 영상 화면을 잘라 낸 것이고, `bunhae/data.js`의 뜻·해체 설명은 화면 글자와 자동 자막을 옮긴 것입니다(받아쓰기 오류가 있을 수 있음).
+- **저작권은 저자에게 있으며, 저자의 허락을 받아 게시합니다. GPL v3는 적용되지 않습니다.**
+
+## 9. shuowen.org 說文解字 데이터
+
+- Copyright 2019 Shuowen.org — <https://github.com/shuowenjiezi/shuowen>
+- Apache License 2.0 — 전문: `bunhae/LICENSE-shuowen-Apache-2.0.txt`
+- `bunhae/shuowen-text.js`는 이 데이터의 표제자·부수·원문을 정리하고, 원문의 구성(从○○聲)을 자동으로 뽑아 덧붙인 것입니다(변경 사항).
+
 ---
 
 ## 이 사이트의 코드
 
 `index.html`, `script.js`, `style.css`, `sw.js`, `manifest.webmanifest`와 자료를 만드는 데 쓴 코드는
 GNU General Public License v3(`LICENSE`)로 공개합니다. 손글씨 인식 프로그램(GPL v3)과 함께 동작하므로
-같은 라이선스를 적용했습니다. 위 1~6의 자료에는 이 라이선스가 아니라 각 자료의 라이선스가 적용됩니다.
+같은 라이선스를 적용했습니다. 위 1~9의 자료에는 이 라이선스가 아니라 각 자료의 라이선스·저작권이 적용됩니다.
 
 Copyright (C) 2026 MEDITATOR-farm
