@@ -1,7 +1,7 @@
 // ===== 글자 풀이 · 기초자 · 說文 540부수 자형 분해 =====
 // 처음에는 소전만 간단히 보여주고, 대응표에서 글자를 누르면 아래 순서로 이어서 보여줌
-//   1) 說文 원문과 부수   2) 기초자 설명(있을 때)   3) 자형 분해(說文 구성을 따라 540부수까지, 부수마다 분해표)
-// 자료: bunhae/data.js(540부수 분해표 위치, 기초자), bunhae/shuowen-text.js(說文 원문 — 처음 필요할 때 불러옴)
+//   1) 기초자 설명(있을 때)   2) 자형 분해(說文 구성을 따라 540부수까지, 부수마다 분해표)
+// 자료: bunhae/data.js(540부수 분해표 위치, 기초자), bunhae/shuowen-text.js(說文 구성 자료 — 처음 필요할 때 불러옴, 원문은 화면에 보여주지 않음)
 // 출처·허락: THIRD_PARTY_NOTICES.md
 
 (function () {
@@ -23,7 +23,7 @@
   const KBYCH = {};
   K.forEach((k, i) => k.chars.forEach((c) => { if (!(c in KBYCH)) KBYCH[c] = i; }));
 
-  // 說文 원문 자료는 1MB 정도라 처음 필요할 때만 불러옴
+  // 說文 구성 자료는 1MB 정도라 처음 필요할 때만 불러옴
   let swReady = null;
   function loadSW() {
     if (swReady) return swReady;
@@ -162,22 +162,18 @@
     head.insertAdjacentHTML("beforeend", `<div><div class="bh-ch">${ch}${via}</div><div class="bh-hun">${huneumOf(ch) || ""}</div></div>`);
     body.appendChild(head);
 
-    if (!e) {
+    if (!e && BOOK[ch] === undefined) {
       body.insertAdjacentHTML("beforeend", '<p class="bh-say">《說文解字》에 실리지 않은 글자입니다. 《說文》 이후에 생긴 글자는 說文의 구성이 없어 자형 분해를 할 수 없습니다.</p>');
-    } else {
-      body.appendChild(step(`說文 원문 — ${R[e[1] - 1].ch}部`, true, (b) => {
-        b.innerHTML = `<p class="bh-shuo">${e[2]}</p><div class="bh-src">《說文解字》 원문 — shuowen.org 자료</div>`;
-      }));
     }
     const ki = KBYCH[ch] ?? (BH_VAR[ch] !== undefined ? KBYCH[BH_VAR[ch]] : undefined);
     if (ki !== undefined) body.appendChild(step(`기초자 설명 — ${K[ki].hun}`, false, (b) => b.appendChild(basicBlock(K[ki]))));
     if (e || BOOK[ch] !== undefined) {
-      body.appendChild(step("자형 분해", false, (b) => {
+      body.appendChild(step("자형 분해", ki === undefined, (b) => {
         const ul = document.createElement("ul");
         ul.className = "bh-tree";
         ul.appendChild(nodeLi(BH_VAR[ch] && BH_SW.idx[ch] === undefined ? BH_VAR[ch] : ch, null, 0, new Set()));
         b.appendChild(ul);
-        b.insertAdjacentHTML("beforeend", '<div class="bh-src">부수까지 나누는 단계는 《說文》 원문의 구성(从○○聲)을 따라 자동으로 만든 것이고, 분해표는 540부수에 대한 저자의 분해입니다.</div>');
+        b.insertAdjacentHTML("beforeend", '<div class="bh-src">부수까지 나누는 단계는 《說文》의 구성(从○○聲)을 따라 자동으로 만든 것이고, 분해표는 540부수에 대한 저자의 분해입니다.</div>');
       }));
     }
   }
