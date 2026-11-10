@@ -43,6 +43,19 @@ const SEAL_PROMPT = `이 사진은 소전(小篆)이나 전각(篆刻)으로 쓴
 {"direction":"vertical 또는 horizontal","columns":[[{"c":"瞑","sure":true},{"c":"想","sure":false,"alt":["相"],"note":""}]]}
 columns는 줄(인장은 세로줄) 하나가 배열 하나입니다.`;
 
+// 손글씨 읽기 — 사이트의 '손글씨로 찾기' 칸에 쓴 글자 하나
+const HW_PROMPT = `이 그림은 사람이 손가락이나 펜으로 쓴 한자 한 글자입니다(흰 바탕에 검은 획).
+어떤 한자인지 읽어 주세요.
+
+규칙:
+1. 필순·획 수가 틀렸거나, 획을 이어 썼거나, 비뚤게 쓴 손글씨일 수 있으니 전체 모양으로 판단합니다.
+2. 정자(번체) 유니코드로 씁니다. 약자·간체로 보이면 그 정자를 c에, 쓴 모양 그대로의 글자를 alt에 넣습니다. 벽자도 확장 한자까지 찾아 씁니다.
+3. 가장 가능성 높은 글자를 c에, 비슷해서 헷갈릴 만한 글자를 가능성 높은 순서로 alt에 넣습니다(최대 5개).
+4. 확신하면 sure를 true, 아니면 false로 합니다. 한자로 보이지 않으면 c를 "?"로 합니다.
+5. 답은 아래 JSON 하나만 출력합니다. 설명 문장은 쓰지 않습니다.
+
+{"direction":"horizontal","columns":[[{"c":"想","sure":true,"alt":["相","恕"],"note":""}]]}`;
+
 function cors(origin, allowed) {
   return {
     "Access-Control-Allow-Origin": origin === allowed ? origin : allowed,
@@ -61,7 +74,7 @@ function reply(obj, status, headers) {
 }
 
 // 모델 답에서 JSON 부분만 꺼내기 (앞뒤에 다른 글이 붙어도 괜찮게)
-export function extractJson(text) {
+export function extractJson(text, maxAlt = 3) {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start < 0 || end <= start) throw new Error("JSON을 찾지 못함");
@@ -74,7 +87,7 @@ export function extractJson(text) {
       .map((x) => ({
         c: Array.from(x.c)[0] || "?",
         sure: x.sure !== false,
-        alt: Array.isArray(x.alt) ? x.alt.filter((a) => typeof a === "string").map((a) => Array.from(a)[0]).slice(0, 3) : [],
+        alt: Array.isArray(x.alt) ? x.alt.filter((a) => typeof a === "string").map((a) => Array.from(a)[0]).slice(0, maxAlt) : [],
         note: typeof x.note === "string" ? x.note.slice(0, 40) : "",
       })))
     .filter((col) => col.length);
@@ -103,7 +116,7 @@ export default {
     try { body = await request.json(); } catch { return reply({ error: "요청 형식이 잘못되었습니다" }, 400, h); }
     const image = String(body.image || "");
     const mediaType = ["image/jpeg", "image/png", "image/webp"].includes(body.mediaType) ? body.mediaType : "image/jpeg";
-    const mode = ["all", "seal"].includes(body.mode) ? body.mode : "big";
+    const mode = ["all", "seal", "hw"].includes(body.mode) ? body.mode : "big";
     if (!image || image.length * 0.75 > MAX_IMAGE_BYTES) return reply({ error: "사진이 없거나 너무 큽니다" }, 400, h);
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -115,12 +128,12 @@ export default {
       },
       body: JSON.stringify({
         model: env.MODEL || DEFAULT_MODEL,
-        max_tokens: 4000,
+        max_tokens: mode === "hw" ? 400 : 4000,
         messages: [{
           role: "user",
           content: [
             { type: "image", source: { type: "base64", media_type: mediaType, data: image } },
-            { type: "text", text: mode === "seal" ? SEAL_PROMPT : PROMPT.replace("MODE가", `MODE는 "${mode}"입니다. MODE가`) },
+            { type: "text", text: mode === "hw" ? HW_PROMPT : mode === "seal" ? SEAL_PROMPT : PROMPT.replace("MODE가", `MODE는 "${mode}"입니다. MODE가`) },
           ],
         }],
       }),
@@ -132,7 +145,7 @@ export default {
     const out = await res.json();
     const text = (out.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
     try {
-      const data = extractJson(text);
+      const data = extractJson(text, mode === "hw" ? 5 : 3);
       return reply({ ...data, mode, usage: out.usage || null }, 200, h);
     } catch (e) {
       return reply({ error: "읽은 결과를 해석하지 못했습니다", detail: text.slice(0, 300) }, 502, h);

@@ -82,8 +82,15 @@
         <div class="buttons hw-buttons">
           <button type="button" id="hw-undo" class="btn">한 획 지우기</button>
           <button type="button" id="hw-clear" class="btn">모두 지우기</button>
+          <button type="button" id="hw-ai" class="btn primary">AI로 읽기</button>
         </div>
-        <p id="hw-count" class="hint">획 순서대로 또박또박 쓰면 더 잘 찾습니다</p>
+        <div id="hw-code-row" class="ph-code-row" hidden>
+          <input type="password" id="hw-code" class="ph-code" placeholder="AI 읽기 비밀번호 (사진 읽기와 같음)" autocomplete="off">
+          <button type="button" id="hw-code-save" class="btn">저장</button>
+        </div>
+        <p id="hw-ai-status" class="hint" hidden></p>
+        <div id="hw-ai-list" class="rs-grid" hidden></div>
+        <p id="hw-count" class="hint">획 순서대로 또박또박 쓰면 더 잘 찾습니다 · 잘 안 나오면 <b>AI로 읽기</b>를 누르세요</p>
         <div id="hw-list" class="rs-grid"></div>
       </details>
     </section>

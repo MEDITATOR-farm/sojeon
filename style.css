@@ -441,3 +441,10 @@ input[type="text"].bh-q { height: 48px; font-size: 1.1rem; margin-bottom: 10px; 
   .pair .k { font-size: 2.2rem; }
   .pair .s { font-size: 3.8rem; }
 }
+
+/* 손글씨 AI 읽기 결과 */
+#hw-ai-list { width: 100%; margin: 2px 0 8px; }
+#hw-ai-status { width: 100%; margin-bottom: 4px; }
+#hw-ai-list .ai-best { outline: 2px solid var(--red); outline-offset: -2px; }
+#hw-ai-list .noseal .rs-thumb::after { content: "소전 없음"; font-size: .6rem; color: var(--muted); }
+#hw-ai:disabled { opacity: .55; }

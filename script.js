@@ -765,6 +765,7 @@ function hwEnd() {
   hwCurrent = null;
   hwDraw();
   hwLookup();
+  if (!hwAiList.hidden || !hwAiStatus.hidden) hwAiReset();
 }
 hwCanvas.addEventListener("pointerup", hwEnd);
 hwCanvas.addEventListener("pointercancel", hwEnd);
@@ -795,8 +796,97 @@ function hwLookup() {
   });
 }
 
-document.getElementById("hw-undo").addEventListener("click", () => { hwStrokes.pop(); hwDraw(); hwLookup(); });
-document.getElementById("hw-clear").addEventListener("click", () => { hwStrokes = []; hwDraw(); hwLookup(); });
+// ----- AI로 읽기: 쓴 획을 흰 바탕 그림으로 만들어 사진 읽기 서버(mode "hw")로 보냄 -----
+// 필순·획 수가 틀리거나 흘려 써도 전체 모양으로 읽음. 한 번에 몇 원 정도의 API 요금이 듦.
+const hwAiBtn = document.getElementById("hw-ai");
+const hwAiStatus = document.getElementById("hw-ai-status");
+const hwAiList = document.getElementById("hw-ai-list");
+const hwCodeRow = document.getElementById("hw-code-row");
+let hwAiSeq = 0;          // 읽는 도중 글자를 고쳐 쓰면 늦게 온 답은 버림
+
+function hwAiReset() {
+  hwAiSeq++;
+  hwAiStatus.hidden = true; hwAiList.hidden = true; hwAiList.innerHTML = "";
+  hwAiBtn.disabled = false;
+}
+
+// 쓴 글자만 잘라 256×256 흰 바탕에 검은 획으로 다시 그림 (쓴 칸 크기·화면 배율과 상관없이 같은 모양)
+function hwImage() {
+  const pts = hwStrokes.flat();
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const N = 256, box = 200;
+  const k = box / Math.max(x1 - x0, y1 - y0, 40);
+  const ox = (N - (x1 - x0) * k) / 2 - x0 * k, oy = (N - (y1 - y0) * k) / 2 - y0 * k;
+  const c = document.createElement("canvas");
+  c.width = c.height = N;
+  const g = c.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, N, N);
+  g.strokeStyle = "#000"; g.lineWidth = 9; g.lineCap = g.lineJoin = "round";
+  hwStrokes.forEach((st) => {
+    g.beginPath();
+    st.forEach(([x, y], i) => (i ? g.lineTo(x * k + ox, y * k + oy) : g.moveTo(x * k + ox, y * k + oy)));
+    if (st.length === 1) g.lineTo(st[0][0] * k + ox + 0.1, st[0][1] * k + oy);
+    g.stroke();
+  });
+  return c.toDataURL("image/png").split(",")[1];
+}
+
+async function hwAiRead() {
+  if (!hwStrokes.length) { hwAiStatus.hidden = false; hwAiStatus.textContent = "먼저 위 칸에 글자를 써 주세요."; return; }
+  const code = phGetCode();
+  if (!code) { hwCodeRow.hidden = false; hwAiStatus.hidden = false; hwAiStatus.textContent = "처음 한 번만 AI 읽기 비밀번호를 입력해 주세요. (사진 읽기와 같은 비밀번호)"; return; }
+  hwCodeRow.hidden = true;
+  const seq = ++hwAiSeq;
+  hwAiBtn.disabled = true;
+  hwAiList.hidden = true; hwAiList.innerHTML = "";
+  hwAiStatus.hidden = false; hwAiStatus.textContent = "AI가 손글씨를 읽는 중… (5~15초)";
+  let data;
+  try {
+    const res = await fetch(PHOTO_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Access-Code": code },
+      body: JSON.stringify({ image: hwImage(), mediaType: "image/png", mode: "hw" }),
+    });
+    data = await res.json();
+    if (seq !== hwAiSeq) return;
+    if (!res.ok) {
+      if (data.code === "bad_code") { phSetCode(""); hwCodeRow.hidden = false; }
+      hwAiStatus.textContent = "읽지 못했습니다: " + (data.error || res.status);
+      return;
+    }
+  } catch (e) {
+    if (seq !== hwAiSeq) return;
+    hwAiStatus.textContent = "서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.";
+    return;
+  } finally {
+    if (seq === hwAiSeq) hwAiBtn.disabled = false;
+  }
+  const x = (data.columns[0] || [])[0];
+  // 워커가 아직 손글씨 모드로 갱신되지 않았으면 alt가 3개까지만 오지만 그대로 동작함
+  const cands = x ? [...new Set([x.c, ...(x.alt || [])])].filter((ch) => ch && ch !== "?") : [];
+  if (!cands.length) { hwAiStatus.textContent = "한자로 읽지 못했습니다. 조금 더 크고 또박또박 써 보세요."; return; }
+  hwAiStatus.innerHTML = `AI가 읽은 글자 <span class="rs-sub">(${x.sure ? "첫 글자가 가장 유력" : "확실하지 않음 — 후보를 비교해 보세요"} · 누르면 입력됩니다)</span>`;
+  cands.forEach((ch, i) => {
+    const b = rsButton({ ch });
+    if (i === 0 && x.sure) b.classList.add("ai-best");
+    if (!hasSeal(ch)) b.classList.add("noseal");
+    hwAiList.appendChild(b);
+  });
+  hwAiList.hidden = false;
+}
+hwAiBtn.addEventListener("click", hwAiRead);
+document.getElementById("hw-code-save").addEventListener("click", () => {
+  const v = document.getElementById("hw-code").value.trim();
+  if (!v) return;
+  phSetCode(v);
+  document.getElementById("hw-code").value = "";
+  hwCodeRow.hidden = true;
+  hwAiRead();
+});
+
+document.getElementById("hw-undo").addEventListener("click", () => { hwStrokes.pop(); hwDraw(); hwLookup(); hwAiReset(); });
+document.getElementById("hw-clear").addEventListener("click", () => { hwStrokes = []; hwDraw(); hwLookup(); hwAiReset(); });
 hwBox.addEventListener("toggle", () => { if (hwBox.open) { hwResize(); hwLoad(); } });
 window.addEventListener("resize", () => { if (hwBox.open) hwResize(); });
 
