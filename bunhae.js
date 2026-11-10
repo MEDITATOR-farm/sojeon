@@ -17,7 +17,9 @@
   const ALIAS = { "丄": 2, "𪞶": 104, "雈": 111, "𠨍": 341, "甶": 347, "㣇": 363, "𢊁": 371, "㚔": 397, "亣": 402, "瀕": 412,
     "𡿨": 413, "𠃊": 456, "亾": 457, "戼": 531, "只": 50, "㕯": 49, "阜": 500, "廾": 62 };
   Object.entries(ALIAS).forEach(([c, n]) => { BOOK[c] = n - 1; });
-  const ROLE = { "": "뜻(形)", "聲": "소리(聲)", "省聲": "줄인 소리(省聲)", "亦聲": "뜻·소리(亦聲)", "省": "줄인 꼴(省)" };
+  const ROLE = { "": "뜻(形)", "聲": "소리(聲)", "省聲": "줄인 소리(省聲)", "亦聲": "뜻·소리(亦聲)", "省": "줄인 꼴(省)",
+    "反": "뒤집은 꼴(反)", "倒": "거꾸로 한 꼴(到)", "古文": "옛 글자(古文)" };
+  const isSound = (r) => /聲/.test(r || "");   // 소리 요소: 聲·省聲·亦聲 (省·反·到·古文은 뜻 요소의 꼴)
 
   const K = BHK80.map(([no, chars, hun, scr, say, d1, d2, ti, di, rad]) => ({ no, chars, hun, scr, say, d1, d2, ti, di, rad }));
   const KBYCH = {};
@@ -87,7 +89,7 @@
     if (sl) sb.appendChild(sl); else sb.innerHTML = '<span class="bh-note">없음</span>';
     row.appendChild(sb);
     row.insertAdjacentHTML("beforeend", `<span class="bh-nc">${ch}</span>`);
-    if (role !== null) row.insertAdjacentHTML("beforeend", `<span class="bh-tag${role ? " sheng" : ""}">${ROLE[role] || role}</span>`);
+    if (role !== null) row.insertAdjacentHTML("beforeend", `<span class="bh-tag${isSound(role) ? " sheng" : ""}">${ROLE[role] || role}</span>`);
     li.appendChild(row);
     const bi = BOOK[ch];
     if (bi !== undefined) { row.appendChild(radButton(bi, li, depth === 0)); return li; }
@@ -176,7 +178,7 @@
       top.appendChild(sb);
       const k = l.k !== undefined ? K[l.k] : null;
       top.insertAdjacentHTML("beforeend", `<span class="bh-nc">${l.ch}</span><span class="bh-hun">${k ? k.hun : (huneumOf(l.ch) || "")}</span>` +
-        `<span class="bh-tag${l.role ? " sheng" : ""}">${ROLE[l.role] || l.role || "뜻(形)"}</span>` +
+        `<span class="bh-tag${isSound(l.role) ? " sheng" : ""}">${ROLE[l.role] || l.role || "뜻(形)"}</span>` +
         (l.via ? `<span class="bh-note">${l.via}에서</span>` : ""));
       card.appendChild(top);
       const words = k ? meaningWords(k) : [];
@@ -203,8 +205,8 @@
 
     // ② 재료 한눈에: 형(뜻) 요소와 성(소리) 요소로 나눠 핵심 뜻 하나씩
     const first = (l) => (l.k !== undefined ? meaningWords(K[l.k])[0] : "") || (huneumOf(l.ch).split(" ")[0] || "?");
-    const fx = leaves.filter((l) => !l.role).map((l) => `${l.ch}(${first(l)})`);
-    const sx = leaves.filter((l) => l.role).map((l) => `${l.ch}(${first(l)})`);
+    const fx = leaves.filter((l) => !isSound(l.role)).map((l) => `${l.ch}(${first(l)})`);
+    const sx = leaves.filter((l) => isSound(l.role)).map((l) => `${l.ch}(${first(l)})`);
     box.insertAdjacentHTML("beforeend", `<div class="bh-h4">② 재료 정리</div>
       <p class="bh-say bh-formula">${fx.join(" + ") || "—"}${sx.length ? ` <span class="bh-note">｜ 소리·뜻 요소</span> ${sx.join(" + ")}` : ""}</p>`);
 
