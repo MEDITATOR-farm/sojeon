@@ -327,6 +327,15 @@ let phChars = [];       // 읽은 글자: [{c, sure, alt, note, col}]
 let phEditing = null;   // 지금 고치고 있는 글자 번호 (없으면 null)
 let phPendingFile = null;
 
+// 사진 속 글자체: 해서(큰 글자만/모두) 또는 소전·전각
+function phMode() {
+  const seal = document.querySelector('input[name="ph-mode"]:checked')?.value === "seal";
+  return seal ? "seal" : document.getElementById("ph-big").checked ? "big" : "all";
+}
+document.querySelectorAll('input[name="ph-mode"]').forEach((r) => r.addEventListener("change", () => {
+  document.getElementById("ph-big-opt").hidden = phMode() === "seal"; // 전각은 큰 글자 구분이 없음
+}));
+
 function phGetCode() { try { return localStorage.getItem("sojeon-photo-code") || ""; } catch (e) { return ""; } }
 function phSetCode(v) { try { localStorage.setItem("sojeon-photo-code", v); } catch (e) {} }
 
@@ -363,13 +372,13 @@ async function phRead(file) {
   let shrunk;
   try { shrunk = await phShrink(file); } catch (e) { phStatus.textContent = e.message; return; }
   phPreview.src = shrunk.dataUrl; phPreview.hidden = false;
-  phStatus.textContent = "AI가 한자를 읽는 중… (10~30초 걸릴 수 있습니다)";
+  phStatus.textContent = phMode() === "seal" ? "AI가 소전·전각을 읽는 중… (10~40초 걸릴 수 있습니다)" : "AI가 한자를 읽는 중… (10~30초 걸릴 수 있습니다)";
   let data;
   try {
     const res = await fetch(PHOTO_API, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Access-Code": code },
-      body: JSON.stringify({ image: shrunk.base64, mediaType: "image/jpeg", mode: document.getElementById("ph-big").checked ? "big" : "all" }),
+      body: JSON.stringify({ image: shrunk.base64, mediaType: "image/jpeg", mode: phMode() }),
     });
     data = await res.json();
     if (!res.ok) {
@@ -455,7 +464,7 @@ function phStartEdit(i) {
   row2.querySelector(".ph-cancel").addEventListener("click", phStopEdit);
   phEdit.appendChild(row2);
   phEdit.insertAdjacentHTML("beforeend",
-    '<p class="hint">글자를 모르면 위의 <b>음·훈</b>, 아래의 <b>손글씨</b>·<b>부수·획수</b> 찾기에서 고르세요. 고른 글자가 이 자리에 들어갑니다.</p>');
+    '<p class="hint">글자를 모르면 위의 <b>음·훈</b>, 아래의 <b>소전 그리기</b>·<b>손글씨</b>·<b>부수·획수</b> 찾기에서 고르세요. 고른 글자가 이 자리에 들어갑니다.</p>');
   phRender();
 }
 function phReplace(ch) {

@@ -37,12 +37,16 @@
 
     <section class="card">
       <details id="ph-box" class="rs-box">
-        <summary class="label">사진으로 찾기 <span class="rs-sub">책·자료를 찍어서</span></summary>
+        <summary class="label">사진으로 찾기 <span class="rs-sub">책·자료·인장을 찍어서</span></summary>
+        <div class="ph-mode" role="radiogroup" aria-label="사진 속 글자체">
+          <label><input type="radio" name="ph-mode" value="kaishu" checked> 해서 (책·자료)</label>
+          <label><input type="radio" name="ph-mode" value="seal"> 소전·전각 (인장·인영)</label>
+        </div>
         <div class="buttons ph-buttons">
           <label class="btn primary ph-pick">📷 사진 찍기<input type="file" id="ph-camera" accept="image/*" capture="environment" hidden></label>
           <label class="btn ph-pick">🖼 사진 고르기<input type="file" id="ph-file" accept="image/*" hidden></label>
         </div>
-        <label class="ph-opt"><input type="checkbox" id="ph-big" checked> 큰 글자(표제자)만 읽기</label>
+        <label class="ph-opt" id="ph-big-opt"><input type="checkbox" id="ph-big" checked> 큰 글자(표제자)만 읽기</label>
         <div id="ph-code-row" class="ph-code-row" hidden>
           <input type="password" id="ph-code" class="ph-code" placeholder="사진 읽기 비밀번호" autocomplete="off">
           <button type="button" id="ph-code-save" class="btn">저장</button>
@@ -55,6 +59,19 @@
           <button type="button" id="ph-apply" class="btn primary">모두 소전으로 변환</button>
           <button type="button" id="ph-reset" class="btn">다시 하기</button>
         </div>
+      </details>
+    </section>
+
+    <section class="card">
+      <details id="sd-box" class="rs-box">
+        <summary class="label">소전을 그려서 찾기 <span class="rs-sub">소전 → 해서</span></summary>
+        <div class="hw-wrap"><canvas id="sd-canvas" class="hw-canvas" aria-label="소전을 손으로 그리는 칸"></canvas></div>
+        <div class="buttons hw-buttons">
+          <button type="button" id="sd-undo" class="btn">한 획 지우기</button>
+          <button type="button" id="sd-clear" class="btn">모두 지우기</button>
+        </div>
+        <p id="sd-count" class="hint">소전을 그리면 비슷한 글자를 찾아 드립니다</p>
+        <div id="sd-list" class="rs-grid"></div>
       </details>
     </section>
 
@@ -156,5 +173,6 @@
   <script src="bunhae/data.js"></script>
   <script src="script.js"></script>
   <script src="bunhae.js"></script>
+  <script src="sealdraw.js"></script>
 </body>
 </html>

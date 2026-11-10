@@ -211,6 +211,13 @@ input[type="text"].yin-input::placeholder { color: var(--muted); opacity: .6; fo
 input[type="text"].ph-type { width: 80px; height: 38px; padding: 0; margin: 0; text-align: center; font-family: "Noto Serif TC", serif; font-size: 1.2rem; color: var(--ink);
   background: rgba(0,0,0,.3); border: 1px solid var(--line); border-radius: 8px; }
 
+.ph-mode { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; margin: 4px 0 10px; font-size: .92rem; }
+.ph-mode label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.ph-mode input { width: 18px; height: 18px; accent-color: var(--gold); }
+/* 소전을 그려서 찾기 */
+.sd-thumb { width: 56px; height: 56px; font-size: 52px; }
+.sd-thumb .sw-glyph { --sz: 52px; }
+
 /* ===== 손글씨로 찾기 ===== */
 .hw-wrap { width: 100%; display: flex; justify-content: center; }
 .hw-canvas {

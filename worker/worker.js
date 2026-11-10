@@ -27,6 +27,22 @@ const PROMPT = `이 사진은 한문 자료(운서·옥편·고서 등)의 한 �
 {"direction":"vertical 또는 horizontal","columns":[[{"c":"閈","sure":true},{"c":"舝","sure":false,"alt":["搴"],"note":""}]]}
 columns는 줄(세로쓰기면 세로줄) 하나가 배열 하나입니다.`;
 
+// 소전·전각(인장) 사진 읽기 — 전각 분석용
+const SEAL_PROMPT = `이 사진은 소전(小篆)이나 전각(篆刻)으로 쓴 글자입니다. 도장 찍은 인영(印影), 도장 면(印面), 책·서예 작품의 소전일 수 있습니다.
+각 글자를 지금 쓰는 해서(楷書) 한자로 읽어 주세요.
+
+규칙:
+1. 도장 면을 직접 찍은 사진이면 글자가 좌우로 뒤집혀 있으니 뒤집어서 읽습니다.
+2. 인장의 읽는 순서는 보통 오른쪽 줄 위에서 아래로, 다음 왼쪽 줄입니다. 回文印처럼 다른 순서로 보이면 그 순서를 따르고 note에 적습니다.
+3. 전각은 글자를 늘이고 줄이고 획을 합쳐 변형하므로, 《說文解字》 소전과 전각에서 흔히 쓰는 변형을 함께 생각해서 읽습니다.
+4. 해서는 정자(번체) 유니코드로 씁니다. 벽자도 확장 한자까지 찾아 씁니다.
+5. 확실하지 않으면 sure를 false로 하고, 가능성 있는 다른 글자를 alt에 넣습니다(최대 3개).
+6. 글자가 아닌 테두리·무늬는 빼고, 읽을 수 없는 글자는 c를 "?"로 하고 note에 생김새를 적습니다.
+7. 답은 아래 JSON 하나만 출력합니다. 설명 문장은 쓰지 않습니다.
+
+{"direction":"vertical 또는 horizontal","columns":[[{"c":"瞑","sure":true},{"c":"想","sure":false,"alt":["相"],"note":""}]]}
+columns는 줄(인장은 세로줄) 하나가 배열 하나입니다.`;
+
 function cors(origin, allowed) {
   return {
     "Access-Control-Allow-Origin": origin === allowed ? origin : allowed,
@@ -87,7 +103,7 @@ export default {
     try { body = await request.json(); } catch { return reply({ error: "요청 형식이 잘못되었습니다" }, 400, h); }
     const image = String(body.image || "");
     const mediaType = ["image/jpeg", "image/png", "image/webp"].includes(body.mediaType) ? body.mediaType : "image/jpeg";
-    const mode = body.mode === "all" ? "all" : "big";
+    const mode = ["all", "seal"].includes(body.mode) ? body.mode : "big";
     if (!image || image.length * 0.75 > MAX_IMAGE_BYTES) return reply({ error: "사진이 없거나 너무 큽니다" }, 400, h);
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -104,7 +120,7 @@ export default {
           role: "user",
           content: [
             { type: "image", source: { type: "base64", media_type: mediaType, data: image } },
-            { type: "text", text: PROMPT.replace("MODE가", `MODE는 "${mode}"입니다. MODE가`) },
+            { type: "text", text: mode === "seal" ? SEAL_PROMPT : PROMPT.replace("MODE가", `MODE는 "${mode}"입니다. MODE가`) },
           ],
         }],
       }),
