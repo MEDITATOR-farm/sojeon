@@ -1,6 +1,6 @@
 // ===== 글자 풀이 · 기초자 · 說文 540부수 자형 분해 =====
 // 처음에는 소전만 간단히 보여주고, 대응표에서 글자를 누르면 아래 순서로 이어서 보여줌
-//   1) 기초자 설명(있을 때)   2) 자형 분해(說文 구성을 따라 540부수까지, 부수마다 분해표)
+//   1) 기초자 설명(있을 때)   2) 자형 분해(說文 구성을 따라 540부수까지, 부수마다 분해표)   3) 소전 해독(기본자형의 뜻으로 훈 짓기)
 // 자료: bunhae/data.js(540부수 분해표 위치, 기초자), bunhae/shuowen-text.js(說文 구성 자료 — 처음 필요할 때 불러옴, 원문은 화면에 보여주지 않음)
 // 출처·허락: THIRD_PARTY_NOTICES.md
 
@@ -126,6 +126,115 @@
     return box;
   }
 
+  // ===== 소전 해독: 기본자형의 뜻으로 훈 만들기 =====
+  // 자형 분해를 기초자(80여 자)에 닿을 때까지 더 내려가 기본자형을 모으고, 각 기본자형의 고유한 뜻(영상 화면 글자)을
+  // 재료로 늘어놓은 뒤 사용자가 골라 훈을 지음. 뜻을 엮는 일은 해독하는 사람의 몫이고, 이 칸은 재료를 모아 줌.
+  const KALIAS = { "𨸏": "阜", "𠬞": "廾", "攵": "攴", "㔾": "卩", "大": "大", "亣": "亣" };
+  function kIndex(ch) {
+    if (KBYCH[ch] !== undefined) return KBYCH[ch];
+    if (KALIAS[ch] && KBYCH[KALIAS[ch]] !== undefined) return KBYCH[KALIAS[ch]];
+    if (window.BH_VAR && BH_VAR[ch] && KBYCH[BH_VAR[ch]] !== undefined) return KBYCH[BH_VAR[ch]];
+    return undefined;
+  }
+  // 기본자형까지 내려가며 모으기: [{ch, role(최상위 구성에서의 역할), k(기초자 번호 또는 undefined), via(거쳐 온 글자)}]
+  function basicLeaves(ch, role, depth, seen, via) {
+    const k = kIndex(ch);
+    if (k !== undefined) return [{ ch, role, k, via }];
+    const e = swEntry(ch);
+    if (!e || !e[3].length || depth >= 6 || seen.has(ch)) return [{ ch, role, k: undefined, via }];
+    const next = new Set(seen); next.add(ch);
+    return e[3].flatMap(([c, r]) => basicLeaves(c, depth === 0 ? r : role, depth + 1, next, depth === 0 ? "" : (via ? via + "›" : "") + ch));
+  }
+  function meaningWords(k) {
+    const src = k.scr || k.say || "";
+    return src.split(/\s*[\/,，.。]\s*|\s*\d+\.\s*|\s*=\s*/).map((x) => x.trim()).filter((x) => x && x.length <= 12);
+  }
+  function hunKey(ch) { return "sojeon-hun-" + ch; }
+  function loadHun(ch) { try { return localStorage.getItem(hunKey(ch)) || ""; } catch (e) { return ""; } }
+  function saveHun(ch, v) { try { v ? localStorage.setItem(hunKey(ch), v) : localStorage.removeItem(hunKey(ch)); } catch (e) {} }
+
+  function decodeBlock(ch, root) {
+    const box = document.createElement("div");
+    box.className = "bh-decode";
+    const leaves = basicLeaves(root, "", 0, new Set(), "");
+    const found = leaves.filter((l) => l.k !== undefined);
+
+    // ① 찾은 기본자형과 그 뜻
+    box.insertAdjacentHTML("beforeend", `<div class="bh-h4">① 기본자형 ${leaves.length}개 중 기초자에서 찾은 것 ${found.length}개</div>`);
+    const list = document.createElement("div");
+    list.className = "bh-leaves";
+    const draft = document.createElement("textarea");
+    leaves.forEach((l) => {
+      const card = document.createElement("div");
+      card.className = "bh-leaf" + (l.k === undefined ? " missing" : "");
+      const top = document.createElement("div");
+      top.className = "bh-node";
+      const sb = document.createElement("span");
+      sb.className = "bh-sb";
+      const sl = sealEl(l.ch);
+      if (sl) sb.appendChild(sl); else sb.innerHTML = '<span class="bh-note">없음</span>';
+      top.appendChild(sb);
+      const k = l.k !== undefined ? K[l.k] : null;
+      top.insertAdjacentHTML("beforeend", `<span class="bh-nc">${l.ch}</span><span class="bh-hun">${k ? k.hun : (huneumOf(l.ch) || "")}</span>` +
+        `<span class="bh-tag${l.role ? " sheng" : ""}">${ROLE[l.role] || l.role || "뜻(形)"}</span>` +
+        (l.via ? `<span class="bh-note">${l.via}에서</span>` : ""));
+      card.appendChild(top);
+      const words = k ? meaningWords(k) : [];
+      const chips = document.createElement("div");
+      chips.className = "bh-kw bh-pick";
+      if (words.length) {
+        words.forEach((w) => {
+          const b = document.createElement("button");
+          b.type = "button"; b.textContent = w;
+          b.title = "눌러서 아래 훈에 넣기";
+          b.addEventListener("click", () => {
+            draft.value = (draft.value ? draft.value.replace(/\s+$/, "") + " " : "") + w;
+            saveHun(ch, draft.value); draft.focus();
+          });
+          chips.appendChild(b);
+        });
+        card.appendChild(chips);
+      } else {
+        card.insertAdjacentHTML("beforeend", `<div class="bh-note">${k ? "영상에 뜻 낱말이 없습니다" : "기초자 목록에 없는 자형입니다" + (huneumOf(l.ch) ? " — 위는 사전의 훈음입니다" : "")}</div>`);
+      }
+      list.appendChild(card);
+    });
+    box.appendChild(list);
+
+    // ② 재료 한눈에: 형(뜻) 요소와 성(소리) 요소로 나눠 핵심 뜻 하나씩
+    const first = (l) => (l.k !== undefined ? meaningWords(K[l.k])[0] : "") || (huneumOf(l.ch).split(" ")[0] || "?");
+    const fx = leaves.filter((l) => !l.role).map((l) => `${l.ch}(${first(l)})`);
+    const sx = leaves.filter((l) => l.role).map((l) => `${l.ch}(${first(l)})`);
+    box.insertAdjacentHTML("beforeend", `<div class="bh-h4">② 재료 정리</div>
+      <p class="bh-say bh-formula">${fx.join(" + ") || "—"}${sx.length ? ` <span class="bh-note">｜ 소리·뜻 요소</span> ${sx.join(" + ")}` : ""}</p>`);
+
+    // ③ 훈 짓기: 위 뜻 낱말을 눌러 모으고 고쳐 씀 (이 기기에 저장)
+    box.insertAdjacentHTML("beforeend", `<div class="bh-h4">③ 훈 짓기 — ${ch}</div>`);
+    draft.className = "bh-hunbox";
+    draft.rows = 3;
+    draft.placeholder = "위의 뜻 낱말을 눌러 모은 뒤, 자연스러운 훈으로 고쳐 쓰세요.";
+    draft.value = loadHun(ch);
+    draft.setAttribute("aria-label", ch + "의 훈 짓기");
+    draft.addEventListener("input", () => saveHun(ch, draft.value.trim()));
+    box.appendChild(draft);
+    const tools = document.createElement("div");
+    tools.className = "bh-tools";
+    const dict = huneumOf(ch);
+    tools.innerHTML = `<span class="bh-note">${dict ? `사전의 훈음: <b>${dict}</b> — 지은 훈과 비교해 보세요` : "사전에 훈음이 없는 글자입니다"}</span>`;
+    const copy = document.createElement("button");
+    copy.type = "button"; copy.className = "rs-st"; copy.textContent = "복사";
+    copy.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(`${ch}: ${draft.value}`); showToast("복사했습니다"); } catch (e) { showToast("복사하지 못했습니다"); }
+    });
+    const clear = document.createElement("button");
+    clear.type = "button"; clear.className = "rs-st"; clear.textContent = "지우기";
+    clear.addEventListener("click", () => { draft.value = ""; saveHun(ch, ""); });
+    tools.append(copy, clear);
+    box.appendChild(tools);
+    box.insertAdjacentHTML("beforeend", '<div class="bh-src">뜻 낱말: 한자해례 「기초자81」 영상 화면(최규화). 기본자형까지 나누는 단계는 說文 구성을 따라 자동으로 만든 것이라 틀릴 수 있습니다. 지은 훈은 이 기기에만 저장됩니다.</div>');
+    return box;
+  }
+
   // 단계별로 펼치는 칸
   function step(title, open, fill) {
     const d = document.createElement("details");
@@ -175,6 +284,9 @@
         b.appendChild(ul);
         b.insertAdjacentHTML("beforeend", '<div class="bh-src">부수까지 나누는 단계는 《說文》의 구성(从○○聲)을 따라 자동으로 만든 것이고, 분해표는 540부수에 대한 저자의 분해입니다.</div>');
       }));
+      // 마지막 단계: 기본자형의 뜻으로 훈 만들기
+      const root = BH_VAR[ch] && BH_SW.idx[ch] === undefined ? BH_VAR[ch] : ch;
+      body.appendChild(step("소전 해독 — 기본자형의 뜻으로 훈 만들기", false, (b) => b.appendChild(decodeBlock(ch, root))));
     }
   }
   // 대응표에서 글자를 누르면 풀이
