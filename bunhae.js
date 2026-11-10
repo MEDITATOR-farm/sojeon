@@ -349,7 +349,7 @@
   });
 
   // ===== 540부수 목록 =====
-  function showRad(i) {
+  function showRad(i, scroll) {
     const r = R[i], box = $("bh-rdetail");
     box.innerHTML = "";
     const head = document.createElement("div");
@@ -366,12 +366,14 @@
       const b = document.createElement("button");
       b.type = "button"; b.className = "rs-st"; b.textContent = t; b.disabled = j < 0 || j >= R.length;
       b.setAttribute("aria-label", t === "‹" ? "이전 부수" : "다음 부수");
-      b.addEventListener("click", () => showRad(j));
+      b.addEventListener("click", () => showRad(j, true));
       nav.appendChild(b);
     });
     head.appendChild(nav);
     box.appendChild(head);
     box.appendChild(chartFor(i));
+    // 목록에서 글자를 누르면 위의 분해표로 바로 이동
+    if (scroll) box.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   function drawRadList() {
     const q = $("bh-q").value.trim(), g = $("bh-rgrid");
@@ -381,7 +383,7 @@
       const b = document.createElement("button");
       b.type = "button"; b.className = "rs-cand";
       b.innerHTML = `<span class="rk">${r.ch}</span><span class="ry">${pad3(r.num)}</span>`;
-      b.addEventListener("click", () => showRad(r.i));
+      b.addEventListener("click", () => showRad(r.i, true));
       g.appendChild(b);
     });
     if (list.length === 1) showRad(list[0].i);
