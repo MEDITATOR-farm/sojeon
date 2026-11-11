@@ -309,11 +309,12 @@
     if (d.shuowen) box.insertAdjacentHTML("beforeend", `<p class="bh-say"><b>《說文》과의 관계</b> — ${esc(d.shuowen)}</p>`);
     const f = d.parts.map((p) => `${esc(p.c)}(${esc(p.mean || "")}${isSound(p.role) ? "·소리" : ""})`).join(" + ");
     box.insertAdjacentHTML("beforeend", `<p class="bh-say bh-formula">${esc(ch)} = ${f}</p>`);
-    if (d.jx) box.insertAdjacentHTML("beforeend", `<div class="bh-h4">기본 부호로 읽기</div><p class="bh-say">${esc(d.jx)}</p>`);
-    if (d.jahae) box.insertAdjacentHTML("beforeend", `<p class="bh-say">${esc(d.jahae)}</p>`);
+    if (d.jx) box.insertAdjacentHTML("beforeend", `<div class="bh-h4">한자 원리로 읽기 — 고유부호·방향·결설 구조</div><p class="bh-say">${esc(d.jx)}</p>`);
+    if (d.jahae) box.insertAdjacentHTML("beforeend", `<div class="bh-h4">통설 풀이 — 《說文》·자전</div><p class="bh-say">${esc(d.jahae)}</p>`);
+    if (d.sori) box.insertAdjacentHTML("beforeend", `<div class="bh-h4">소리</div><p class="bh-say">${esc(d.sori)}</p>`);
     if (d.hun) box.insertAdjacentHTML("beforeend", `<p class="bh-say">훈: <b>${esc(d.hun)}</b></p>`);
     if (d.note) box.insertAdjacentHTML("beforeend", `<p class="bh-say bh-note">${esc(d.note)}</p>`);
-    box.insertAdjacentHTML("beforeend", `<div class="bh-src">AI(Claude)가 「한자와 방향」·「고유부호(기본 획)」(최규화)을 해석 틀로 삼아 풀이한 것입니다${d.sure === false ? " — <b>AI도 확신하지 못한 풀이</b>" : ""}. 《說文》 원문이 아니므로 자전으로 확인해 주세요.${known ? "" : " 아래 자형 분해는 이 구성요소에서부터 《說文》을 따라 이어 갑니다."}</div>`);
+    box.insertAdjacentHTML("beforeend", `<div class="bh-src">AI(Claude)가 『한자해례 1800+』 「한자 원리」(최규화)를 해석 틀로 삼아 풀이한 것입니다${d.sure === false ? " — <b>AI도 확신하지 못한 풀이</b>" : ""}. 《說文》 원문이 아니므로 자전으로 확인해 주세요.${known ? "" : " 아래 자형 분해는 이 구성요소에서부터 《說文》을 따라 이어 갑니다."}</div>`);
     const bar = document.createElement("div");
     bar.className = "buttons";
     const again = document.createElement("button");
@@ -387,9 +388,9 @@
     if (e && !ai) {
       const known = e[3].map(([c, r]) => `${c}(${ROLE[r] || r})`).join(" + ") || "더 나누지 않음(象形·指事 등)";
       const saved = jxCached(ch);
-      body.appendChild(step("AI 자형 해석 — 기본 부호와 방향으로 읽기", !!saved, (b) => {
+      body.appendChild(step("AI 자형 해석 — 한자 원리로 읽기", !!saved, (b) => {
         if (saved) { b.appendChild(jahaeBlock(ch, saved, known)); return; }
-        b.insertAdjacentHTML("beforeend", `<p class="bh-say">AI가 「한자와 방향」·「고유부호(기본 획)」을 해석 틀로 삼아, 《說文》 구성(${esc(known)})을 따라 이 소전의 획과 면을 읽어 줍니다.</p>`);
+        b.insertAdjacentHTML("beforeend", `<p class="bh-say">AI가 「한자 원리」(방향·고유부호·뜻·소리)를 해석 틀로 삼아, 《說文》 구성(${esc(known)})을 따라 이 소전의 획과 면을 읽어 줍니다.</p>`);
         const bar = document.createElement("div");
         bar.className = "buttons";
         const btn = document.createElement("button");
@@ -468,7 +469,21 @@
         (b.key ? `<p class="bh-say">▶ ${esc(b.key)}</p>` : "") + (b.sw ? `<p class="bh-say bh-note">說 ${esc(b.sw)}</p>` : "") + "</div>";
       box.appendChild(det);
     });
-    box.insertAdjacentHTML("beforeend", `<div class="bh-h4">참고 — 점</div><p class="bh-say">${esc(BU.dot)}</p><div class="bh-src">출처: ${esc(BU.src)}. 저자의 허락을 받아 옮겼습니다. 이 내용은 AI 자형 해석의 해석 틀로도 쓰입니다.</div>`);
+    box.insertAdjacentHTML("beforeend", `<div class="bh-h4">참고 — 점</div><p class="bh-say">${esc(BU.dot)}</p>`);
+    const sec = (title, rows) => {
+      box.insertAdjacentHTML("beforeend", `<div class="bh-h4">${title}</div>`);
+      rows.forEach(([t, say, egs]) => {
+        const det = document.createElement("details");
+        det.className = "bh-step";
+        det.innerHTML = `<summary>${esc(t)}</summary><div class="bh-step-body"><p class="bh-say">${esc(say)}</p>` +
+          (egs || []).map(([c, x]) => `<p class="bh-say">예) <b>${c}</b> — ${esc(x)}</p>`).join("") + "</div>";
+        box.appendChild(det);
+      });
+    };
+    if (BU.yi) sec("뜻(字義)", BU.yi);
+    if (BU.eum) sec("소리(字音)", BU.eum);
+    if (BU.pic) box.insertAdjacentHTML("beforeend", `<p class="bh-say">${esc(BU.pic)}</p>`);
+    box.insertAdjacentHTML("beforeend", `<div class="bh-src">출처: ${esc(BU.src)}. 저자의 허락을 받아 옮겼습니다(일부는 줄여 옮김). 이 내용은 AI 자형 해석의 해석 틀로 쓰입니다.</div>`);
   }
   if ($("bh-buho")) $("bh-buho").addEventListener("toggle", () => {
     if (!$("bh-buho").open || buhoDrawn) return;
