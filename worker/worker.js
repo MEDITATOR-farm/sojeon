@@ -56,24 +56,48 @@ const HW_PROMPT = `이 그림은 사람이 손가락이나 펜으로 쓴 한자 
 
 {"direction":"horizontal","columns":[[{"c":"想","sure":true,"alt":["相","恕"],"note":""}]]}`;
 
-// 자해(字解) — 《說文》 표제자로 바로 찾을 수 없는 글자를 구성요소로 풀이 (그림 없이 글자만 보냄)
-const JAHAE_PROMPT = `한자 「CHAR」의 자해(字解)를 해 주세요. 사이트는 이 글자를 《說文解字》 표제자에서 바로 찾지 못했습니다.
+// 자형 해석의 바탕 — 최규화 「한자와 방향」·「고유부호(기본 획)」 요약 (사이트 bunhae/buho.js와 같은 내용. 저자 허락을 받아 씀)
+const BUHO = `[해석 틀 — 소전 기본 부호와 방향 (최규화)]
+방향: 한자는 방향에 따라 뜻이 달라진다(人과 匕는 같은 모양, 방향이 달라 다른 뜻). 해가 절대 기준이다.
+ 남쪽이 앞·위, 북쪽이 뒤·아래, 해가 뜨는 왼쪽이 동쪽, 오른쪽이 서쪽(背: 등진 北 쪽이 북쪽).
+ 東(왼쪽): 봄, 아침, 태어나다, 밝아지다, 새로운 왕조, 반역, 오랑캐
+ 南(위): 여름, 한낮, 성장, 열기
+ 西(오른쪽): 가을, 저녁, 수확, 어두워지다, 쇠퇴, 도움, 우리 편
+ 北(아래): 겨울, 밤, 죽음, 추위
+기본 획: 점·선·면. 소전 기준 모두 1획이며 언제나 같은 뜻으로 쓰인다. 점은 소전 결합자에 보이지 않고, 점으로 보이는 것은 대개 짧은 선이다.
+ 선(직선)
+  一 가로선: 땅, 담, 막히다(예: 국경). 위아래를 가르는 안팎의 경계 — 땅거죽, 껍질, 수면, 국경, 한계. 숫자 1.
+  丨 세로선: 찢다, 가르다(예: 좌우). 좌우를 가름, 땅을 뚫어 세운 말뚝 — 뚫다, 통하다, 세우다.
+ 선(곡선) — 움직임·파동. 방향은 해 기준.
+  ʃ(丿) 오르는 곡선: 나오다, 오르다, 솟다(예: 수증기)
+  ʅ(乀) 내리는 곡선: 들어가다, 내려가다, 꺼지다(예: 물)
+ 면(공간) — 에워싸 가둔 것. 어느 쪽이 열렸느냐로 뜻이 갈린다.
+  囗 사방이 막힘: 가두다, 에워싸다, 지키다, 성, 덩이(흙벽돌·반죽·돌덩이)
+  ⊐ 왼쪽(동)이 열림(コ 파): 봄, 씨를 꺼내다, 빼다(예: 파종)
+  ∪ 위(남)가 열림(凵 감): 여름, 물기가 빠져 비다, 마르다, 위가 터진 그릇(예: 증발)
+  ⊏ 오른쪽(서)이 열림(匚 방): 가을, 거두어 넣다, 상자(예: 금고)
+  ∩ 아래(북)가 열림(冖 멱): 겨울, 덮다, 열기가 빠지지 않게 거적을 씌우다`;
+
+// 자해(字解) — 글자 하나를 구성요소와 기본 부호로 풀이 (그림 없이 글자만 보냄)
+const JAHAE_PROMPT = `한자 「CHAR」의 자해(字解)와 소전 자형 해석을 해 주세요.
+KNOWN
+
+${BUHO}
 
 순서:
-1. 《說文》에 이체(重文: 古文·籒文·篆文·或體 등)나 다른 글자체로 실려 있으면 그 표제자와 관계를 shuowen에 씁니다. 예: "說文 표제자 厵(𠫐)의 篆文".
-   《說文》 이후에 생긴 글자면 그렇게 씁니다. 예: "《說文》 이후 글자(《玉篇》 수록)". 모르면 빈칸.
-2. 이 글자를 바로 아래 단계의 구성요소로 나눠 parts에 씁니다. 지금 해서 모양이 아니라 자원(字源)을 따릅니다.
-   예: 原 → 厂 + 泉 (白·小로 나누지 않음).
-   - c: 구성요소 한 글자(유니코드 정자, 가능하면 《說文》 표제자 꼴). 줄인 꼴(省)이면 원래 글자를 쓰고 role에 표시합니다.
+1. shuowen: 《說文》과의 관계. 표제자면 "說文 표제자", 이체(古文·籒文·篆文·或體 등)로 실렸으면 그 표제자와 관계(예: "說文 표제자 厵(𠫐)의 篆文"), 《說文》 이후 글자면 그렇게(예: "《說文》 이후 글자(《玉篇》 수록)"). 모르면 빈칸.
+2. parts: 바로 아래 단계의 구성요소. 지금 해서 모양이 아니라 자원(字源)을 따릅니다(예: 原 → 厂 + 泉, 白·小로 나누지 않음). 위에 《說文》 구성이 주어졌으면 그대로 따릅니다.
+   - c: 구성요소 한 글자(유니코드 정자, 가능하면 《說文》 표제자 꼴). 줄인 꼴이면 원래 글자를 쓰고 role에 표시.
    - role: "" (뜻), "聲" (소리), "亦聲" (뜻·소리), "省" (줄인 꼴), "省聲" (줄인 소리) 중 하나.
    - mean: 이 글자 안에서 그 요소가 맡는 뜻, 한국어로 짧게.
-3. jahae: 구성요소의 뜻을 엮어 글자 뜻이 생긴 과정을 한국어 2~3문장으로 풀이합니다.
-4. hun: 대표 훈과 음. 예: "근원 원".
-5. 학설이 갈리면 가장 널리 받아들여지는 풀이를 쓰고, 다른 설은 note에 한 문장으로 씁니다. 확신이 없으면 sure를 false로 합니다.
-   지어내지 말고, 모르는 부분은 모른다고 note에 씁니다.
+3. jx: 소전 자형 해석. 위의 해석 틀(기본 획·면이 열린 방향·해 기준 방위)로 이 글자의 소전 모양을 읽어, 각 부호가 무엇을 뜻하고 어떻게 어울려 글자 뜻이 되는지 한국어 2~4문장으로 씁니다.
+   소전에 실제로 있는 획·면만 짚고, 틀에 억지로 끼워 맞추지 않습니다. 틀로 설명되지 않는 부분은 구성요소의 뜻으로 설명합니다.
+4. jahae: 구성요소의 뜻을 엮어 글자 뜻이 생긴 과정을 한국어 2~3문장으로.
+5. hun: 대표 훈과 음(예: "근원 원").
+6. 학설이 갈리면 가장 널리 받아들여지는 풀이를 쓰고 다른 설은 note에 한 문장으로. 확신이 없으면 sure를 false로. 지어내지 말고 모르는 부분은 note에 모른다고 씁니다.
 
 답은 아래 JSON 하나만 출력합니다.
-{"shuowen":"","parts":[{"c":"厂","role":"","mean":"언덕"},{"c":"泉","role":"","mean":"샘"}],"jahae":"","hun":"","sure":true,"note":""}`;
+{"shuowen":"","parts":[{"c":"厂","role":"","mean":"언덕"},{"c":"泉","role":"","mean":"샘"}],"jx":"","jahae":"","hun":"","sure":true,"note":""}`;
 
 const ROLES = ["", "聲", "亦聲", "省", "省聲"];
 export function extractJahae(text) {
@@ -86,7 +110,7 @@ export function extractJahae(text) {
     role: ROLES.includes(p.role) ? p.role : "",
     mean: str(p.mean, 40),
   })).filter((p) => /\p{Script=Han}/u.test(p.c));
-  return { shuowen: str(d.shuowen, 120), parts, jahae: str(d.jahae, 600), hun: str(d.hun, 40), sure: d.sure !== false, note: str(d.note, 300) };
+  return { shuowen: str(d.shuowen, 120), parts, jx: str(d.jx, 800), jahae: str(d.jahae, 600), hun: str(d.hun, 40), sure: d.sure !== false, note: str(d.note, 300) };
 }
 
 function cors(origin, allowed) {
@@ -151,14 +175,17 @@ export default {
     // 자해 모드: 그림 없이 글자 하나만
     if (body.mode === "jahae") {
       const ch = Array.from(String(body.char || ""))[0] || "";
+      // 사이트가 아는 《說文》 구성(예: "从水工聲" → "水(뜻) + 工(소리)")이 오면 그대로 따르게 함
+      const known = String(body.known || "").replace(/[`$\\]/g, "").slice(0, 200);
+      const prompt = JAHAE_PROMPT.replace("CHAR", ch).replace("KNOWN", known ? `사이트가 가진 《說文》 구성: ${known}` : "");
       if (!/\p{Script=Han}/u.test(ch)) return reply({ error: "한자 한 글자를 보내 주세요" }, 400, h);
       const r = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
         body: JSON.stringify({
           model: env.MODEL || DEFAULT_MODEL,
-          max_tokens: 1200,
-          messages: [{ role: "user", content: JAHAE_PROMPT.replace("CHAR", ch) }],
+          max_tokens: 1800,
+          messages: [{ role: "user", content: prompt }],
         }),
       });
       if (!r.ok) return reply({ error: "Claude API 오류", status: r.status, detail: (await r.text()).slice(0, 300) }, 502, h);

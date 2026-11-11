@@ -452,3 +452,10 @@ input[type="text"].bh-q { height: 48px; font-size: 1.1rem; margin-bottom: 10px; 
 /* 소전 결과 그림 보내기 */
 #img-btns { flex-wrap: wrap; align-items: center; }
 .img-opt { font-size: .85rem; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+
+/* 기본 부호와 방향 표 */
+.bh-dir { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: .9rem; }
+.bh-dir th, .bh-dir td { border: 1px solid var(--line, rgba(255,255,255,.15)); padding: 5px 7px; text-align: left; vertical-align: top; }
+.bh-dir th { white-space: nowrap; font-size: 1.05rem; }
+.bh-dir thead th { font-size: .8rem; color: var(--muted); }
+.bh-dir th .bh-note { font-size: .7rem; font-weight: normal; }

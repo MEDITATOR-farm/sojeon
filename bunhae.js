@@ -139,11 +139,20 @@
     return undefined;
   }
   // 기본자형까지 내려가며 모으기: [{ch, role(최상위 구성에서의 역할), k(기초자 번호 또는 undefined), via(거쳐 온 글자)}]
+  // 기본 부호(고유부호) — 기초자 80자에 없는 一·丨·丿·乀·囗·凵·冖·コ·匚 (bunhae/buho.js)
+  const BU = window.BH_BUHO || { items: [] };
+  const BUBYCH = {};
+  BU.items.forEach((b) => { BUBYCH[b.ch] = b; });
+  const BUALIAS = { "冂": "冖", "口": null };          // 冂(∩ 꼴)은 저자의 ∩(冖 덮다)로 봄
+  function buho(ch) { return BUBYCH[ch] || (BUALIAS[ch] ? BUBYCH[BUALIAS[ch]] : undefined); }
+  function buhoWords(b) { return [...new Set([...b.mean, ...b.key.split(/\s*,\s*/)].filter(Boolean))]; }
+
   function basicLeaves(ch, role, depth, seen, via) {
     const k = kIndex(ch);
     if (k !== undefined) return [{ ch, role, k, via }];
+    if (buho(ch)) return [{ ch, role, k: undefined, b: buho(ch), via }];
     const e = swEntry(ch);
-    if (!e || !e[3].length || depth >= 6 || seen.has(ch)) return [{ ch, role, k: undefined, via }];
+    if (!e || !e[3].length || depth >= 6 || seen.has(ch)) return [{ ch, role, k: undefined, via }];   // (기본 부호는 위에서 먼저 잡음)
     const next = new Set(seen); next.add(ch);
     return e[3].flatMap(([c, r]) => basicLeaves(c, depth === 0 ? r : role, depth + 1, next, depth === 0 ? "" : (via ? via + "›" : "") + ch));
   }
@@ -159,16 +168,16 @@
     const box = document.createElement("div");
     box.className = "bh-decode";
     const leaves = basicLeaves(root, "", 0, new Set(), "");
-    const found = leaves.filter((l) => l.k !== undefined);
+    const found = leaves.filter((l) => l.k !== undefined || l.b);
 
     // ① 찾은 기본자형과 그 뜻
-    box.insertAdjacentHTML("beforeend", `<div class="bh-h4">① 기본자형 ${leaves.length}개 중 기초자에서 찾은 것 ${found.length}개</div>`);
+    box.insertAdjacentHTML("beforeend", `<div class="bh-h4">① 기본자형 ${leaves.length}개 중 기초자·기본 부호에서 찾은 것 ${found.length}개</div>`);
     const list = document.createElement("div");
     list.className = "bh-leaves";
     const draft = document.createElement("textarea");
     leaves.forEach((l) => {
       const card = document.createElement("div");
-      card.className = "bh-leaf" + (l.k === undefined ? " missing" : "");
+      card.className = "bh-leaf" + (l.k === undefined && !l.b ? " missing" : "");
       const top = document.createElement("div");
       top.className = "bh-node";
       const sb = document.createElement("span");
@@ -177,11 +186,11 @@
       if (sl) sb.appendChild(sl); else sb.innerHTML = '<span class="bh-note">없음</span>';
       top.appendChild(sb);
       const k = l.k !== undefined ? K[l.k] : null;
-      top.insertAdjacentHTML("beforeend", `<span class="bh-nc">${l.ch}</span><span class="bh-hun">${k ? k.hun : (huneumOf(l.ch) || "")}</span>` +
+      top.insertAdjacentHTML("beforeend", `<span class="bh-nc">${l.ch}</span><span class="bh-hun">${k ? k.hun : l.b ? l.b.hun + " · 기본 부호 " + l.b.seal : (huneumOf(l.ch) || "")}</span>` +
         `<span class="bh-tag${isSound(l.role) ? " sheng" : ""}">${ROLE[l.role] || l.role || "뜻(形)"}</span>` +
         (l.via ? `<span class="bh-note">${l.via}에서</span>` : ""));
       card.appendChild(top);
-      const words = k ? meaningWords(k) : [];
+      const words = k ? meaningWords(k) : l.b ? buhoWords(l.b) : [];
       const chips = document.createElement("div");
       chips.className = "bh-kw bh-pick";
       if (words.length) {
@@ -204,7 +213,7 @@
     box.appendChild(list);
 
     // ② 재료 한눈에: 형(뜻) 요소와 성(소리) 요소로 나눠 핵심 뜻 하나씩
-    const first = (l) => (l.k !== undefined ? meaningWords(K[l.k])[0] : "") || (huneumOf(l.ch).split(" ")[0] || "?");
+    const first = (l) => (l.k !== undefined ? meaningWords(K[l.k])[0] : l.b ? l.b.mean[0] : "") || (huneumOf(l.ch).split(" ")[0] || "?");
     const fx = leaves.filter((l) => !isSound(l.role)).map((l) => `${l.ch}(${first(l)})`);
     const sx = leaves.filter((l) => isSound(l.role)).map((l) => `${l.ch}(${first(l)})`);
     box.insertAdjacentHTML("beforeend", `<div class="bh-h4">② 재료 정리</div>
@@ -233,7 +242,7 @@
     clear.addEventListener("click", () => { draft.value = ""; saveHun(ch, ""); });
     tools.append(copy, clear);
     box.appendChild(tools);
-    box.insertAdjacentHTML("beforeend", '<div class="bh-src">뜻 낱말: 한자해례 「기초자81」 영상 화면(최규화). 기본자형까지 나누는 단계는 說文 구성을 따라 자동으로 만든 것이라 틀릴 수 있습니다. 지은 훈은 이 기기에만 저장됩니다.</div>');
+    box.insertAdjacentHTML("beforeend", '<div class="bh-src">뜻 낱말: 한자해례 「기초자81」 영상 화면, 기본 부호는 「고유부호(기본 획)」(최규화). 기본자형까지 나누는 단계는 說文 구성을 따라 자동으로 만든 것이라 틀릴 수 있습니다. 지은 훈은 이 기기에만 저장됩니다.</div>');
     return box;
   }
 
@@ -257,6 +266,8 @@
   // AI(사진 읽기와 같은 서버, mode "jahae")가 자원(字源)에 따른 구성요소를 주면, 그 구성을 임시 說文 항목으로 넣어
   // 아래의 자형 분해(說文 트리)·소전 해독(기초자)을 그대로 이어서 씀. 결과는 이 기기에 저장해 다음부터는 무료.
   const JKEY = "sojeon-jahae-";
+  const XKEY = "sojeon-jx-";        // 說文 표제자 글자의 AI 자형 해석 (분해 트리는 說文 그대로 두고 해석만 덧붙임)
+  function jxCached(ch) { try { return JSON.parse(localStorage.getItem(XKEY + ch) || "null"); } catch (e) { return null; } }
   const AI_SET = new Set();
   function jahaeCached(ch) { try { return JSON.parse(localStorage.getItem(JKEY + ch) || "null"); } catch (e) { return null; } }
   function applyJahae(ch, d) {
@@ -265,11 +276,12 @@
     if (AI_SET.has(ch)) BH_SW.rows[BH_SW.idx[ch]] = row;
     else { BH_SW.idx[ch] = BH_SW.rows.length; BH_SW.rows.push(row); AI_SET.add(ch); }
   }
-  function dropJahae(ch) {
-    try { localStorage.removeItem(JKEY + ch); } catch (e) { /* 저장 안 됨 */ }
+  function dropJahae(ch, known) {
+    try { localStorage.removeItem((known ? XKEY : JKEY) + ch); } catch (e) { /* 저장 안 됨 */ }
+    if (known) return;
     if (AI_SET.has(ch)) { delete BH_SW.idx[ch]; AI_SET.delete(ch); }
   }
-  async function askJahae(ch, btn, msg) {
+  async function askJahae(ch, btn, msg, known) {
     const code = typeof phGetCode === "function" ? phGetCode() : "";
     if (!code) { msg.textContent = "AI 비밀번호가 없습니다. 위의 「사진으로 찾기」에서 비밀번호를 한 번 저장해 주세요."; return; }
     btn.disabled = true;
@@ -278,29 +290,30 @@
       const res = await fetch(PHOTO_API, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Access-Code": code },
-        body: JSON.stringify({ mode: "jahae", char: ch }),
+        body: JSON.stringify({ mode: "jahae", char: ch, known: known || "" }),
       });
       const d = await res.json();
       if (!res.ok) { msg.textContent = "풀이하지 못했습니다: " + (d.error || res.status); return; }
       if (d.mode !== "jahae") { msg.textContent = "서버(Cloudflare 워커)가 아직 자해 기능이 없는 옛 버전입니다. 새 worker.js로 갱신해 주세요."; return; }
-      if (!d.parts || !d.parts.length) { msg.textContent = "AI가 구성요소를 내놓지 못했습니다." + (d.note ? " " + d.note : ""); return; }
-      try { localStorage.setItem(JKEY + ch, JSON.stringify(d)); } catch (e) { /* 저장 안 됨 */ }
-      applyJahae(ch, d);
+      if (!known && (!d.parts || !d.parts.length)) { msg.textContent = "AI가 구성요소를 내놓지 못했습니다." + (d.note ? " " + d.note : ""); return; }
+      try { localStorage.setItem((known ? XKEY : JKEY) + ch, JSON.stringify(d)); } catch (e) { /* 저장 안 됨 */ }
+      if (!known) applyJahae(ch, d);
       explain(ch);
     } catch (e) {
       msg.textContent = "서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.";
     } finally { btn.disabled = false; }
   }
-  function jahaeBlock(ch, d) {
+  function jahaeBlock(ch, d, known) {
     const box = document.createElement("div");
     box.className = "bh-basic bh-jahae";
     if (d.shuowen) box.insertAdjacentHTML("beforeend", `<p class="bh-say"><b>《說文》과의 관계</b> — ${esc(d.shuowen)}</p>`);
     const f = d.parts.map((p) => `${esc(p.c)}(${esc(p.mean || "")}${isSound(p.role) ? "·소리" : ""})`).join(" + ");
     box.insertAdjacentHTML("beforeend", `<p class="bh-say bh-formula">${esc(ch)} = ${f}</p>`);
+    if (d.jx) box.insertAdjacentHTML("beforeend", `<div class="bh-h4">기본 부호로 읽기</div><p class="bh-say">${esc(d.jx)}</p>`);
     if (d.jahae) box.insertAdjacentHTML("beforeend", `<p class="bh-say">${esc(d.jahae)}</p>`);
     if (d.hun) box.insertAdjacentHTML("beforeend", `<p class="bh-say">훈: <b>${esc(d.hun)}</b></p>`);
     if (d.note) box.insertAdjacentHTML("beforeend", `<p class="bh-say bh-note">${esc(d.note)}</p>`);
-    box.insertAdjacentHTML("beforeend", `<div class="bh-src">AI(Claude)가 알고 있는 지식으로 풀이한 것입니다${d.sure === false ? " — <b>AI도 확신하지 못한 풀이</b>" : ""}. 《說文》 원문이 아니므로 자전으로 확인해 주세요. 아래 자형 분해는 이 구성요소에서부터 《說文》을 따라 이어 갑니다.</div>`);
+    box.insertAdjacentHTML("beforeend", `<div class="bh-src">AI(Claude)가 「한자와 방향」·「고유부호(기본 획)」(최규화)을 해석 틀로 삼아 풀이한 것입니다${d.sure === false ? " — <b>AI도 확신하지 못한 풀이</b>" : ""}. 《說文》 원문이 아니므로 자전으로 확인해 주세요.${known ? "" : " 아래 자형 분해는 이 구성요소에서부터 《說文》을 따라 이어 갑니다."}</div>`);
     const bar = document.createElement("div");
     bar.className = "buttons";
     const again = document.createElement("button");
@@ -309,8 +322,8 @@
     del.type = "button"; del.className = "btn"; del.textContent = "풀이 지우기";
     const msg = document.createElement("p");
     msg.className = "hint";
-    again.addEventListener("click", () => askJahae(ch, again, msg));
-    del.addEventListener("click", () => { dropJahae(ch); explain(ch); });
+    again.addEventListener("click", () => askJahae(ch, again, msg, known));
+    del.addEventListener("click", () => { dropJahae(ch, !!known); explain(ch); });
     bar.append(again, del);
     box.append(bar, msg);
     return box;
@@ -355,7 +368,7 @@
       box.append(bar, msg);
       body.appendChild(box);
     }
-    if (ai) body.appendChild(step("AI 자해 — 《說文》 표제자에 없는 글자", true, (b) => b.appendChild(jahaeBlock(ch, ai))));
+    if (ai) body.appendChild(step("AI 자해 — 《說文》 표제자에 없는 글자", true, (b) => b.appendChild(jahaeBlock(ch, ai, ""))));
     const ki = KBYCH[ch] ?? (BH_VAR[ch] !== undefined ? KBYCH[BH_VAR[ch]] : undefined);
     if (ki !== undefined) body.appendChild(step(`기초자 설명 — ${K[ki].hun}`, false, (b) => b.appendChild(basicBlock(K[ki]))));
     if (e || BOOK[ch] !== undefined) {
@@ -369,6 +382,24 @@
       // 마지막 단계: 기본자형의 뜻으로 훈 만들기
       const root = BH_VAR[ch] && BH_SW.idx[ch] === undefined ? BH_VAR[ch] : ch;
       body.appendChild(step("소전 해독 — 기본자형의 뜻으로 훈 만들기", false, (b) => b.appendChild(decodeBlock(ch, root))));
+    }
+    // 說文 표제자 글자: 기본 부호를 틀로 한 AI 자형 해석 (說文 구성을 함께 보내 그대로 따르게 함)
+    if (e && !ai) {
+      const known = e[3].map(([c, r]) => `${c}(${ROLE[r] || r})`).join(" + ") || "더 나누지 않음(象形·指事 등)";
+      const saved = jxCached(ch);
+      body.appendChild(step("AI 자형 해석 — 기본 부호와 방향으로 읽기", !!saved, (b) => {
+        if (saved) { b.appendChild(jahaeBlock(ch, saved, known)); return; }
+        b.insertAdjacentHTML("beforeend", `<p class="bh-say">AI가 「한자와 방향」·「고유부호(기본 획)」을 해석 틀로 삼아, 《說文》 구성(${esc(known)})을 따라 이 소전의 획과 면을 읽어 줍니다.</p>`);
+        const bar = document.createElement("div");
+        bar.className = "buttons";
+        const btn = document.createElement("button");
+        btn.type = "button"; btn.className = "btn primary"; btn.textContent = "AI로 자형 해석하기";
+        const msg = document.createElement("p");
+        msg.className = "hint";
+        btn.addEventListener("click", () => askJahae(ch, btn, msg, known));
+        bar.appendChild(btn);
+        b.append(bar, msg);
+      }));
     }
   }
   // 대응표에서 글자를 누르면 풀이
@@ -416,6 +447,34 @@
     box.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   let basicsDrawn = false;
+  // ===== 기본 부호 참고 칸 =====
+  let buhoDrawn = false;
+  function drawBuho() {
+    const box = $("bh-buho-body");
+    const d = BU.dir;
+    let h = `<div class="bh-h4">한자와 방향</div>` + d.say.map((t) => `<p class="bh-say">${esc(t)}</p>`).join("") +
+      `<table class="bh-dir"><tbody>${d.rows.map(([c, w, m]) => `<tr><th>${c}</th><td>${esc(m)}</td></tr>`).join("")}</tbody></table>` +
+      `<div class="bh-h4">고유부호 (기본 획)</div><p class="bh-say">${esc(BU.intro)}</p>` +
+      `<table class="bh-dir bh-bu"><thead><tr><th>부호</th><th>소전 모양</th><th>뜻</th><th>예</th></tr></thead><tbody>` +
+      BU.items.map((b) => `<tr><th>${b.ch}<div class="bh-note">${esc(b.hun)}</div></th><td>${esc(b.seal)}</td><td>${esc(b.mean.join(", "))}</td><td>${esc(b.ex)}</td></tr>`).join("") +
+      `</tbody></table><p class="bh-say">${esc(BU.face)}</p>`;
+    box.innerHTML = h;
+    BU.items.forEach((b) => {
+      const det = document.createElement("details");
+      det.className = "bh-step";
+      det.innerHTML = `<summary>${b.ch} (${esc(b.hun)}) — ${esc(b.mean.join(", "))}</summary><div class="bh-step-body">` +
+        `<p class="bh-say">${esc(b.say)}</p>` +
+        b.egs.map(([c, t]) => `<p class="bh-say">예) <b>${c}</b> — ${esc(t)}</p>`).join("") +
+        (b.key ? `<p class="bh-say">▶ ${esc(b.key)}</p>` : "") + (b.sw ? `<p class="bh-say bh-note">說 ${esc(b.sw)}</p>` : "") + "</div>";
+      box.appendChild(det);
+    });
+    box.insertAdjacentHTML("beforeend", `<div class="bh-h4">참고 — 점</div><p class="bh-say">${esc(BU.dot)}</p><div class="bh-src">출처: ${esc(BU.src)}. 저자의 허락을 받아 옮겼습니다. 이 내용은 AI 자형 해석의 해석 틀로도 쓰입니다.</div>`);
+  }
+  if ($("bh-buho")) $("bh-buho").addEventListener("toggle", () => {
+    if (!$("bh-buho").open || buhoDrawn) return;
+    buhoDrawn = true; drawBuho();
+  });
+
   $("bh-basics").addEventListener("toggle", () => {
     if (!$("bh-basics").open || basicsDrawn) return;
     basicsDrawn = true;
