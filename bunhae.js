@@ -253,6 +253,70 @@
     return d;
   }
 
+  // ===== AI 자해: 《說文》 표제자로 바로 찾을 수 없는 글자 =====
+  // AI(사진 읽기와 같은 서버, mode "jahae")가 자원(字源)에 따른 구성요소를 주면, 그 구성을 임시 說文 항목으로 넣어
+  // 아래의 자형 분해(說文 트리)·소전 해독(기초자)을 그대로 이어서 씀. 결과는 이 기기에 저장해 다음부터는 무료.
+  const JKEY = "sojeon-jahae-";
+  const AI_SET = new Set();
+  function jahaeCached(ch) { try { return JSON.parse(localStorage.getItem(JKEY + ch) || "null"); } catch (e) { return null; } }
+  function applyJahae(ch, d) {
+    if (!d || !d.parts || !d.parts.length || (BH_SW.idx[ch] !== undefined && !AI_SET.has(ch))) return;
+    const row = [ch, -1, "", d.parts.map((p) => [p.c, p.role || ""]), ""];
+    if (AI_SET.has(ch)) BH_SW.rows[BH_SW.idx[ch]] = row;
+    else { BH_SW.idx[ch] = BH_SW.rows.length; BH_SW.rows.push(row); AI_SET.add(ch); }
+  }
+  function dropJahae(ch) {
+    try { localStorage.removeItem(JKEY + ch); } catch (e) { /* 저장 안 됨 */ }
+    if (AI_SET.has(ch)) { delete BH_SW.idx[ch]; AI_SET.delete(ch); }
+  }
+  async function askJahae(ch, btn, msg) {
+    const code = typeof phGetCode === "function" ? phGetCode() : "";
+    if (!code) { msg.textContent = "AI 비밀번호가 없습니다. 위의 「사진으로 찾기」에서 비밀번호를 한 번 저장해 주세요."; return; }
+    btn.disabled = true;
+    msg.textContent = "AI가 자해하는 중… (10~20초)";
+    try {
+      const res = await fetch(PHOTO_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Access-Code": code },
+        body: JSON.stringify({ mode: "jahae", char: ch }),
+      });
+      const d = await res.json();
+      if (!res.ok) { msg.textContent = "풀이하지 못했습니다: " + (d.error || res.status); return; }
+      if (d.mode !== "jahae") { msg.textContent = "서버(Cloudflare 워커)가 아직 자해 기능이 없는 옛 버전입니다. 새 worker.js로 갱신해 주세요."; return; }
+      if (!d.parts || !d.parts.length) { msg.textContent = "AI가 구성요소를 내놓지 못했습니다." + (d.note ? " " + d.note : ""); return; }
+      try { localStorage.setItem(JKEY + ch, JSON.stringify(d)); } catch (e) { /* 저장 안 됨 */ }
+      applyJahae(ch, d);
+      explain(ch);
+    } catch (e) {
+      msg.textContent = "서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.";
+    } finally { btn.disabled = false; }
+  }
+  function jahaeBlock(ch, d) {
+    const box = document.createElement("div");
+    box.className = "bh-basic bh-jahae";
+    if (d.shuowen) box.insertAdjacentHTML("beforeend", `<p class="bh-say"><b>《說文》과의 관계</b> — ${esc(d.shuowen)}</p>`);
+    const f = d.parts.map((p) => `${esc(p.c)}(${esc(p.mean || "")}${isSound(p.role) ? "·소리" : ""})`).join(" + ");
+    box.insertAdjacentHTML("beforeend", `<p class="bh-say bh-formula">${esc(ch)} = ${f}</p>`);
+    if (d.jahae) box.insertAdjacentHTML("beforeend", `<p class="bh-say">${esc(d.jahae)}</p>`);
+    if (d.hun) box.insertAdjacentHTML("beforeend", `<p class="bh-say">훈: <b>${esc(d.hun)}</b></p>`);
+    if (d.note) box.insertAdjacentHTML("beforeend", `<p class="bh-say bh-note">${esc(d.note)}</p>`);
+    box.insertAdjacentHTML("beforeend", `<div class="bh-src">AI(Claude)가 알고 있는 지식으로 풀이한 것입니다${d.sure === false ? " — <b>AI도 확신하지 못한 풀이</b>" : ""}. 《說文》 원문이 아니므로 자전으로 확인해 주세요. 아래 자형 분해는 이 구성요소에서부터 《說文》을 따라 이어 갑니다.</div>`);
+    const bar = document.createElement("div");
+    bar.className = "buttons";
+    const again = document.createElement("button");
+    again.type = "button"; again.className = "btn"; again.textContent = "다시 풀이";
+    const del = document.createElement("button");
+    del.type = "button"; del.className = "btn"; del.textContent = "풀이 지우기";
+    const msg = document.createElement("p");
+    msg.className = "hint";
+    again.addEventListener("click", () => askJahae(ch, again, msg));
+    del.addEventListener("click", () => { dropJahae(ch); explain(ch); });
+    bar.append(again, del);
+    box.append(bar, msg);
+    return box;
+  }
+  function esc(t) { return String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+
   // ===== 글자 풀이 =====
   async function explain(ch) {
     const card = $("bh-card"), body = $("bh-body");
@@ -261,6 +325,8 @@
     card.scrollIntoView({ behavior: "smooth", block: "start" });
     try { await loadSW(); } catch (e) { body.innerHTML = `<p class="hint">${e.message}</p>`; return; }
     body.innerHTML = "";
+    if (swEntry(ch) === null || AI_SET.has(ch)) applyJahae(ch, jahaeCached(ch));   // 이 기기에 저장한 AI 자해
+    const ai = AI_SET.has(ch) ? jahaeCached(ch) : null;
     const e = swEntry(ch);
     const head = document.createElement("div");
     head.className = "bh-head";
@@ -274,12 +340,26 @@
     body.appendChild(head);
 
     if (!e && BOOK[ch] === undefined) {
-      body.insertAdjacentHTML("beforeend", '<p class="bh-say">《說文解字》에 실리지 않은 글자입니다. 《說文》 이후에 생긴 글자는 說文의 구성이 없어 자형 분해를 할 수 없습니다.</p>');
+      const box = document.createElement("div");
+      box.className = "bh-basic bh-jahae";
+      box.insertAdjacentHTML("beforeend", '<p class="bh-say">《說文解字》 표제자에서 바로 찾지 못한 글자입니다. 說文에 이체(古文·篆文 등)로 실렸거나 《說文》 이후에 생긴 글자일 수 있습니다.</p>' +
+        '<p class="bh-say"><b>AI로 자해하기</b>를 누르면 AI가 자원(字源)에 따라 구성요소를 나누고, 그 구성요소부터는 《說文》 자형 분해와 기초자 해독으로 이어서 보여 드립니다.</p>');
+      const bar = document.createElement("div");
+      bar.className = "buttons";
+      const btn = document.createElement("button");
+      btn.type = "button"; btn.className = "btn primary"; btn.textContent = "AI로 자해하기";
+      const msg = document.createElement("p");
+      msg.className = "hint";
+      btn.addEventListener("click", () => askJahae(ch, btn, msg));
+      bar.appendChild(btn);
+      box.append(bar, msg);
+      body.appendChild(box);
     }
+    if (ai) body.appendChild(step("AI 자해 — 《說文》 표제자에 없는 글자", true, (b) => b.appendChild(jahaeBlock(ch, ai))));
     const ki = KBYCH[ch] ?? (BH_VAR[ch] !== undefined ? KBYCH[BH_VAR[ch]] : undefined);
     if (ki !== undefined) body.appendChild(step(`기초자 설명 — ${K[ki].hun}`, false, (b) => b.appendChild(basicBlock(K[ki]))));
     if (e || BOOK[ch] !== undefined) {
-      body.appendChild(step("자형 분해", ki === undefined, (b) => {
+      body.appendChild(step(ai ? "자형 분해 — AI가 나눈 구성요소부터" : "자형 분해", ki === undefined && !ai, (b) => {
         const ul = document.createElement("ul");
         ul.className = "bh-tree";
         ul.appendChild(nodeLi(BH_VAR[ch] && BH_SW.idx[ch] === undefined ? BH_VAR[ch] : ch, null, 0, new Set()));

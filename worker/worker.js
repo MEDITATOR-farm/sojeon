@@ -56,6 +56,39 @@ const HW_PROMPT = `이 그림은 사람이 손가락이나 펜으로 쓴 한자 
 
 {"direction":"horizontal","columns":[[{"c":"想","sure":true,"alt":["相","恕"],"note":""}]]}`;
 
+// 자해(字解) — 《說文》 표제자로 바로 찾을 수 없는 글자를 구성요소로 풀이 (그림 없이 글자만 보냄)
+const JAHAE_PROMPT = `한자 「CHAR」의 자해(字解)를 해 주세요. 사이트는 이 글자를 《說文解字》 표제자에서 바로 찾지 못했습니다.
+
+순서:
+1. 《說文》에 이체(重文: 古文·籒文·篆文·或體 등)나 다른 글자체로 실려 있으면 그 표제자와 관계를 shuowen에 씁니다. 예: "說文 표제자 厵(𠫐)의 篆文".
+   《說文》 이후에 생긴 글자면 그렇게 씁니다. 예: "《說文》 이후 글자(《玉篇》 수록)". 모르면 빈칸.
+2. 이 글자를 바로 아래 단계의 구성요소로 나눠 parts에 씁니다. 지금 해서 모양이 아니라 자원(字源)을 따릅니다.
+   예: 原 → 厂 + 泉 (白·小로 나누지 않음).
+   - c: 구성요소 한 글자(유니코드 정자, 가능하면 《說文》 표제자 꼴). 줄인 꼴(省)이면 원래 글자를 쓰고 role에 표시합니다.
+   - role: "" (뜻), "聲" (소리), "亦聲" (뜻·소리), "省" (줄인 꼴), "省聲" (줄인 소리) 중 하나.
+   - mean: 이 글자 안에서 그 요소가 맡는 뜻, 한국어로 짧게.
+3. jahae: 구성요소의 뜻을 엮어 글자 뜻이 생긴 과정을 한국어 2~3문장으로 풀이합니다.
+4. hun: 대표 훈과 음. 예: "근원 원".
+5. 학설이 갈리면 가장 널리 받아들여지는 풀이를 쓰고, 다른 설은 note에 한 문장으로 씁니다. 확신이 없으면 sure를 false로 합니다.
+   지어내지 말고, 모르는 부분은 모른다고 note에 씁니다.
+
+답은 아래 JSON 하나만 출력합니다.
+{"shuowen":"","parts":[{"c":"厂","role":"","mean":"언덕"},{"c":"泉","role":"","mean":"샘"}],"jahae":"","hun":"","sure":true,"note":""}`;
+
+const ROLES = ["", "聲", "亦聲", "省", "省聲"];
+export function extractJahae(text) {
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error("no json");
+  const d = JSON.parse(m[0]);
+  const str = (v, n) => String(v || "").slice(0, n);
+  const parts = (Array.isArray(d.parts) ? d.parts : []).slice(0, 6).map((p) => ({
+    c: Array.from(String(p.c || ""))[0] || "",
+    role: ROLES.includes(p.role) ? p.role : "",
+    mean: str(p.mean, 40),
+  })).filter((p) => /\p{Script=Han}/u.test(p.c));
+  return { shuowen: str(d.shuowen, 120), parts, jahae: str(d.jahae, 600), hun: str(d.hun, 40), sure: d.sure !== false, note: str(d.note, 300) };
+}
+
 function cors(origin, allowed) {
   return {
     "Access-Control-Allow-Origin": origin === allowed ? origin : allowed,
@@ -114,6 +147,26 @@ export default {
 
     let body;
     try { body = await request.json(); } catch { return reply({ error: "요청 형식이 잘못되었습니다" }, 400, h); }
+
+    // 자해 모드: 그림 없이 글자 하나만
+    if (body.mode === "jahae") {
+      const ch = Array.from(String(body.char || ""))[0] || "";
+      if (!/\p{Script=Han}/u.test(ch)) return reply({ error: "한자 한 글자를 보내 주세요" }, 400, h);
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({
+          model: env.MODEL || DEFAULT_MODEL,
+          max_tokens: 1200,
+          messages: [{ role: "user", content: JAHAE_PROMPT.replace("CHAR", ch) }],
+        }),
+      });
+      if (!r.ok) return reply({ error: "Claude API 오류", status: r.status, detail: (await r.text()).slice(0, 300) }, 502, h);
+      const o = await r.json();
+      const t = (o.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
+      try { return reply({ ...extractJahae(t), char: ch, mode: "jahae", usage: o.usage || null }, 200, h); }
+      catch (e) { return reply({ error: "풀이 결과를 해석하지 못했습니다", detail: t.slice(0, 300) }, 502, h); }
+    }
     const image = String(body.image || "");
     const mediaType = ["image/jpeg", "image/png", "image/webp"].includes(body.mediaType) ? body.mediaType : "image/jpeg";
     const mode = ["all", "seal", "hw"].includes(body.mode) ? body.mode : "big";
