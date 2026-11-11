@@ -925,3 +925,93 @@ if (isIOS && !isStandalone) document.getElementById("ios-hint").hidden = false;
 // 처음 열었을 때 한 번 변환
 convert();
 loadHuneum(); // 훈음 사전 불러오기
+
+
+// ===== 소전 결과를 그림(PNG)으로 만들어 보내기·저장 =====
+// 화면의 소전은 글꼴 SVG(jsDelivr)와 說文 그림 조각(shuowen/pNNN.png)이 섞여 있어, 한 장의 캔버스에 다시 그림.
+// 흰 바탕에 검은 글씨(카톡에서 잘 보이게). '투명 바탕'을 고르면 바탕 없이 검은 글씨만.
+const IMG_CELL = 200, IMG_GAP = 24, IMG_PAD = 40, IMG_WRAP = 8;   // 글자 크기·간격·여백, 한 줄 최대 글자 수
+const spriteCache = {};
+function loadImg(src) {
+  return new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = no; im.src = src; });
+}
+async function glyphPiece(span) {
+  const img = span.querySelector("img.glyph");
+  if (img && img.src) {
+    // 다른 서버 그림을 그대로 캔버스에 그리면 저장이 막히므로, 내용을 받아 이 사이트 안의 그림으로 바꿔서 그림
+    const file = img.src.slice(img.src.lastIndexOf("/") + 1);
+    let svg = null;
+    for (const u of [img.src, ...GLYPH_BASES.map((base) => base + file)]) {   // 한 곳이 막히면 다른 서버에서
+      try { const r = await fetch(u); if (r.ok) { svg = await r.text(); break; } } catch (e) { /* 다음 */ }
+    }
+    if (!svg) return { text: codeToChar(file.replace(".svg", "")) };
+    const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+    try { return { im: await loadImg(url) }; } finally { setTimeout(() => URL.revokeObjectURL(url), 5000); }
+  }
+  const sw = span.querySelector(".sw-glyph");
+  if (sw) {
+    const src = sw.style.backgroundImage.slice(5, -2).replace(/^["']|["']$/g, "");
+    spriteCache[src] = spriteCache[src] || loadImg(src);
+    const im = await spriteCache[src], c = im.width / 10;
+    const x = +sw.style.getPropertyValue("--x"), y = +sw.style.getPropertyValue("--y");
+    return { im, sx: x * c, sy: y * c, sw: c };
+  }
+  return { text: span.textContent.trim() };
+}
+async function resultImage() {
+  const spans = [...output.children].filter((sp) => sp.textContent.trim() || sp.querySelector("img, .sw-glyph"));
+  if (!spans.length) throw new Error("먼저 해서를 입력하고 변환해 주세요.");
+  const pieces = await Promise.all(spans.map((sp) => glyphPiece(sp).catch(() => ({ text: sp.textContent.trim() || "?" }))));
+  const vert = document.getElementById("img-vert").checked;
+  const lines = Math.ceil(pieces.length / IMG_WRAP), per = Math.min(pieces.length, IMG_WRAP);
+  const along = per * IMG_CELL + (per - 1) * IMG_GAP, across = lines * IMG_CELL + (lines - 1) * IMG_GAP;
+  const cv = document.createElement("canvas");
+  cv.width = (vert ? across : along) + IMG_PAD * 2;
+  cv.height = (vert ? along : across) + IMG_PAD * 2;
+  const g = cv.getContext("2d");
+  if (!document.getElementById("img-clear").checked) { g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height); }
+  pieces.forEach((p, i) => {
+    const line = Math.floor(i / IMG_WRAP), pos = i % IMG_WRAP;
+    // 세로쓰기는 위→아래, 줄은 오른쪽→왼쪽 (옛 책·전각 순서)
+    const x = IMG_PAD + (vert ? (lines - 1 - line) : pos) * (IMG_CELL + IMG_GAP);
+    const y = IMG_PAD + (vert ? pos : line) * (IMG_CELL + IMG_GAP);
+    if (p.im && p.sw) g.drawImage(p.im, p.sx, p.sy, p.sw, p.sw, x, y, IMG_CELL, IMG_CELL);
+    else if (p.im) g.drawImage(p.im, x, y, IMG_CELL, IMG_CELL);
+    else if (p.text) {
+      g.fillStyle = "#000"; g.font = `${IMG_CELL * 0.8}px "Noto Serif TC", serif`;
+      g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText(p.text, x + IMG_CELL / 2, y + IMG_CELL / 2);
+    }
+  });
+  return new Promise((ok) => cv.toBlob(ok, "image/png"));
+}
+function imgName() {
+  return "소전_" + (input.value || "").replace(/\s+/g, "").slice(0, 10) + ".png";
+}
+document.getElementById("btn-share").addEventListener("click", async () => {
+  let blob;
+  try { blob = await resultImage(); } catch (e) { showToast(e.message || "그림을 만들지 못했습니다."); return; }
+  const file = new File([blob], imgName(), { type: "image/png" });
+  // 휴대폰: 공유 창 → 카카오톡 선택
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); } catch (e) { /* 사용자가 닫음 */ }
+    return;
+  }
+  // PC: 그림을 클립보드에 복사 → 카톡 대화창에서 Ctrl+V
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    showToast("그림을 복사했습니다. 카톡 대화창에서 Ctrl+V 로 붙여 넣으세요.");
+  } catch (e) {
+    saveBlob(blob);
+    showToast("이 브라우저는 그림 복사를 지원하지 않아 파일로 저장했습니다.");
+  }
+});
+function saveBlob(blob) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = imgName();
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+document.getElementById("btn-saveimg").addEventListener("click", async () => {
+  try { saveBlob(await resultImage()); } catch (e) { showToast(e.message || "그림을 만들지 못했습니다."); }
+});

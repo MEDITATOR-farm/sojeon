@@ -1,6 +1,6 @@
 // 소전 앱 오프라인 저장소 (서비스 워커)
 // 파일을 고쳐 올릴 때마다 아래 버전 숫자를 하나씩 올려 주세요. → 휴대폰에 설치된 앱도 새 파일로 바뀝니다.
-const VERSION = "sojeon-v16";
+const VERSION = "sojeon-v17";
 
 // 앱을 처음 열 때 미리 저장해 두는 기본 파일
 const CORE = [
@@ -49,7 +49,8 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(
       caches.open(VERSION).then((c) =>
         c.match(req).then((hit) =>
-          hit || fetch(req).then((res) => {
+          // <img>로 받아 둔 저장본(내용을 읽을 수 없는 opaque)은 그림 보내기(fetch)에 쓸 수 없으니 다시 받음
+          (hit && !(hit.type === "opaque" && req.mode === "cors") ? hit : null) || fetch(req).then((res) => {
             if (res.ok || res.type === "opaque") c.put(req, res.clone());
             return res;
           })

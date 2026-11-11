@@ -448,3 +448,7 @@ input[type="text"].bh-q { height: 48px; font-size: 1.1rem; margin-bottom: 10px; 
 #hw-ai-list .ai-best { outline: 2px solid var(--red); outline-offset: -2px; }
 #hw-ai-list .noseal .rs-thumb::after { content: "소전 없음"; font-size: .6rem; color: var(--muted); }
 #hw-ai:disabled { opacity: .55; }
+
+/* 소전 결과 그림 보내기 */
+#img-btns { flex-wrap: wrap; align-items: center; }
+.img-opt { font-size: .85rem; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
