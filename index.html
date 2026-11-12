@@ -16,7 +16,7 @@
   <meta name="description" content="해서체 한자를 입력하면 유니코드 소전(小篆) 글자로 바꿔주는 변환기">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=30">
+  <link rel="stylesheet" href="style.css?v=33">
 </head>
 <body>
   <main class="wrap">
@@ -165,6 +165,15 @@
     </section>
 
     <section class="card">
+      <details id="s1800" class="rs-box">
+        <summary class="label">소전 1800 <span class="rs-sub">교육용 기초한자를 소전으로 — 부수별</span></summary>
+        <p class="hint">한국 교육용 기초한자 1,800자를 소전으로 펼쳤습니다. 소전 100의 부수 순서로 묶었고, 부수 안에서는 획수 순입니다. 부수를 누르면 펼쳐지고, 소전을 누르면 글자 풀이가 나옵니다.</p>
+        <p class="hint s1800-legend"><b>表</b> 說文 표제자 · <b>重</b> 說文 重文 · <b>異</b> 이체자의 소전 · <b>本</b> 본자(옛 꼴)의 소전 · <b>古</b> 고문 · <b>字</b> 소전 글꼴(說文 원본 아님) · <b>無</b> 소전 없음</p>
+        <div id="s1800-groups"></div>
+      </details>
+    </section>
+
+    <section class="card">
       <details id="bh-buho" class="rs-box">
         <summary class="label">한자 원리 <span class="rs-sub">방향·고유부호·뜻·소리 — 최규화</span></summary>
         <div id="bh-buho-body" class="bh-body"></div>
@@ -212,11 +221,12 @@
   <script src="shuowen.js"></script>
   <script src="bushou.js"></script>
   <script src="bunhae/data.js"></script>
-  <script src="bunhae/buho.js?v=30"></script>
-  <script src="bunhae/k80det.js?v=30"></script>
-  <script src="bunhae/s100.js?v=30"></script>
-  <script src="script.js?v=30"></script>
-  <script src="bunhae.js?v=31"></script>
-  <script src="sealdraw.js?v=30"></script>
+  <script src="bunhae/buho.js?v=33"></script>
+  <script src="bunhae/k80det.js?v=33"></script>
+  <script src="bunhae/s100.js?v=33"></script>
+  <script src="bunhae/s1800.js?v=33"></script>
+  <script src="script.js?v=33"></script>
+  <script src="bunhae.js?v=33"></script>
+  <script src="sealdraw.js?v=33"></script>
 </body>
 </html>

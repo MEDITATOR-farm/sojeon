@@ -46,9 +46,12 @@
     return i === undefined ? null : BH_SW.rows[i];
   }
   // 소전 그림: 說文 원본(崇羲) — 해서와 說文 표제자가 다르면 이체 관계로 찾아봄
+  // 교육용 1800자의 이체·본자 소전 연결 (bunhae/s1800.js) — 글자 → [소전을 찾을 글자, 표시]
+  const SEALOF = {};
+  (window.BH_S1800 || []).forEach((g) => g[3].forEach(([c, s, t]) => { if (s) SEALOF[c] = [s, t]; }));
   function sealEl(ch) {
     if (!RVAR && window.BH_VAR) { RVAR = {}; Object.entries(BH_VAR).forEach(([k, v]) => { if (!(v in RVAR)) RVAR[v] = k; }); }
-    const key = [ch, window.BH_VAR && BH_VAR[ch], RVAR && RVAR[ch]].find((c) => c && SHUOWEN[c]);
+    const key = [ch, SEALOF[ch] && SEALOF[ch][0], window.BH_VAR && BH_VAR[ch], RVAR && RVAR[ch]].find((c) => c && SHUOWEN[c]);
     if (key) return makeShuowenImage(SHUOWEN[key][0]);
     const codes = CUSTOM_SEAL_MAP[ch] || SEAL_MAP[ch];
     return codes ? makeSealImage(codes[0]) : null;
@@ -76,34 +79,6 @@
     b.addEventListener("click", toggle);
     if (open) toggle();
     return b;
-  }
-
-  // 자형 분해 트리: 說文 '从○○聲'을 따라 540부수에 닿을 때까지 나눔
-  function nodeLi(ch, role, depth, seen) {
-    const li = document.createElement("li");
-    const row = document.createElement("div");
-    row.className = "bh-node";
-    const sb = document.createElement("span");
-    sb.className = "bh-sb";
-    const sl = sealEl(ch);
-    if (sl) sb.appendChild(sl); else sb.innerHTML = '<span class="bh-note">없음</span>';
-    row.appendChild(sb);
-    row.insertAdjacentHTML("beforeend", `<span class="bh-nc">${ch}</span>`);
-    if (role !== null) row.insertAdjacentHTML("beforeend", `<span class="bh-tag${isSound(role) ? " sheng" : ""}">${ROLE[role] || role}</span>`);
-    li.appendChild(row);
-    const bi = BOOK[ch];
-    if (bi !== undefined) { row.appendChild(radButton(bi, li, depth === 0)); return li; }
-    const e = swEntry(ch);
-    if (!e || !e[3].length || depth >= 4 || seen.has(ch)) {
-      const why = !e ? "《說文》에 표제자로 없음" : !e[3].length ? "더 나누지 않음(象形 등)" : "";
-      if (why) row.insertAdjacentHTML("beforeend", `<span class="bh-note">${why}</span>`);
-      return li;
-    }
-    const ul = document.createElement("ul");
-    const next = new Set(seen); next.add(ch);
-    e[3].forEach(([c, r]) => ul.appendChild(nodeLi(c, r, depth + 1, next)));
-    li.appendChild(ul);
-    return li;
   }
 
   // 기초자 설명 블록
@@ -161,16 +136,21 @@
   function buho(ch) { return BUBYCH[ch] || (BUALIAS[ch] ? BUBYCH[BUALIAS[ch]] : undefined); }
   function buhoWords(b) { return [...new Set([...b.mean, ...b.key.split(/\s*,\s*/)].filter(Boolean))]; }
 
-  function basicLeaves(ch, role, depth, seen, via) {
+  // 기본자형 모으기 — 기초자 80자 → 고유부호 → 540부수(저자 분해표)에서 멈추고, 그 밖의 글자는 AI가 소전을 보고 나눈 트리를 따라 내려감.
+  // 《說文》의 구성 설명(从○○聲)은 쓰지 않음.
+  function basicLeaves(ch, role, depth, seen, via, node) {
     const k = kIndex(ch);
-    if (k !== undefined) return [{ ch, role, k, via }];
-    if (buho(ch)) return [{ ch, role, k: undefined, b: buho(ch), via }];
-    // 540부수 글자는 자형 분해 트리처럼 저자의 분해표에서 멈춤 (說文 원문으로 더 내려가지 않음)
-    if (BOOK[ch] !== undefined) return [{ ch, role, k: undefined, r: BOOK[ch], via }];
-    const e = swEntry(ch);
-    if (!e || !e[3].length || depth >= 6 || seen.has(ch)) return [{ ch, role, k: undefined, via }];   // (기본 부호는 위에서 먼저 잡음)
-    const next = new Set(seen); next.add(ch);
-    return e[3].flatMap(([c, r]) => basicLeaves(c, depth === 0 ? r : role, depth + 1, next, depth === 0 ? "" : (via ? via + "›" : "") + ch));
+    if (k !== undefined) return [{ ch, role: "", k, via }];
+    if (buho(ch)) return [{ ch, role: "", k: undefined, b: buho(ch), via }];
+    if (radIndex(ch) !== undefined) return [{ ch, role: "", k: undefined, r: radIndex(ch), via }];
+    if (depth === 0 && !node) node = (splitCached(ch) || {}).tree;
+    if (!node || !node.parts || !node.parts.length || depth >= 5) return [{ ch, role: "", k: undefined, via }];
+    return node.parts.flatMap((p) => basicLeaves(p.c, "", depth + 1, seen, depth === 0 ? "" : (via ? via + "›" : "") + ch, p));
+  }
+  function radIndex(ch) {
+    if (BOOK[ch] !== undefined) return BOOK[ch];
+    if (window.BH_VAR && BH_VAR[ch] && BOOK[BH_VAR[ch]] !== undefined) return BOOK[BH_VAR[ch]];
+    return undefined;
   }
   function meaningWords(k) {
     const src = k.scr || k.say || "";
@@ -242,7 +222,7 @@
       top.appendChild(sb);
       const k = l.k !== undefined ? K[l.k] : null;
       top.insertAdjacentHTML("beforeend", `<span class="bh-nc">${l.ch}</span><span class="bh-hun">${k ? k.hun : l.b ? l.b.hun + " · 기본 부호 " + l.b.seal : (huneumOf(l.ch) || "") + (l.r !== undefined ? ` · 부수 ${pad3(R[l.r].num)}` : "")}</span>` +
-        `<span class="bh-tag${isSound(l.role) ? " sheng" : ""}">${ROLE[l.role] || l.role || "뜻(形)"}</span>` +
+        ``+
         (l.via ? `<span class="bh-note">${l.via}에서</span>` : ""));
       card.appendChild(top);
       const words = k ? meaningWords(k) : l.b ? buhoWords(l.b) : [];
@@ -301,7 +281,7 @@
     clear.addEventListener("click", () => { draft.value = ""; saveHun(ch, ""); });
     tools.append(copy, clear);
     box.appendChild(tools);
-    box.insertAdjacentHTML("beforeend", '<div class="bh-src">뜻 낱말: 한자해례 「기초자81」 영상 화면, 기본 부호는 「고유부호(기본 획)」(최규화). 기본자형까지 나누는 단계는 說文 구성을 따라 자동으로 만든 것이라 틀릴 수 있습니다. 지은 훈은 이 기기에만 저장됩니다.</div>');
+    box.insertAdjacentHTML("beforeend", '<div class="bh-src">뜻 낱말: 한자해례 「기초자81」 영상 화면, 기본 부호는 「고유부호(기본 획)」(최규화). 기본자형까지 나누는 단계는 저자 분해표와 AI의 소전 판독으로 만든 것이라 틀릴 수 있습니다. 지은 훈은 이 기기에만 저장됩니다.</div>');
     return box;
   }
 
@@ -428,7 +408,7 @@
     del.type = "button"; del.className = "btn"; del.textContent = "풀이 지우기";
     const msg = document.createElement("p");
     msg.className = "hint";
-    again.addEventListener("click", () => askJahae(ch, again, msg, known, known ? leafPayload(rootOf(ch)) : null));
+    again.addEventListener("click", () => askJahae(ch, again, msg, known, known ? leafPayload(ch) : null));
     del.addEventListener("click", () => { dropJahae(ch, !!known); explain(ch); });
     bar.append(again, del);
     box.append(bar, msg);
@@ -437,73 +417,153 @@
   function esc(t) { return String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
 
   // ===== 글자 풀이 =====
+  // ===== AI 자형 분해: 소전 그림을 보고 기초자 80자·540부수·고유부호에 닿을 때까지 나눔 (워커 mode "split") =====
+  const SKEY = "sojeon-split-";
+  function splitCached(ch) { try { return JSON.parse(localStorage.getItem(SKEY + ch) || "null"); } catch (e) { return null; } }
+  async function sealPng(ch) {
+    // 화면의 소전(說文 그림 조각 또는 글꼴 SVG)을 256×256 흰 바탕 그림으로 (script.js의 glyphPiece 사용)
+    const sp = document.createElement("span");
+    const el = sealEl(ch);
+    if (!el || typeof glyphPiece !== "function") return "";
+    sp.appendChild(el);
+    const p = await glyphPiece(sp);
+    if (!p.im) return "";
+    const c = document.createElement("canvas");
+    c.width = c.height = 256;
+    const g = c.getContext("2d");
+    g.fillStyle = "#fff"; g.fillRect(0, 0, 256, 256);
+    if (p.sw) g.drawImage(p.im, p.sx, p.sy, p.sw, p.sw, 16, 16, 224, 224); else g.drawImage(p.im, 16, 16, 224, 224);
+    return c.toDataURL("image/png").split(",")[1];
+  }
+  async function askSplit(ch, btn, msg) {
+    const code = typeof phGetCode === "function" ? phGetCode() : "";
+    if (!code) { msg.textContent = "AI 비밀번호가 없습니다. 위의 「사진으로 찾기」에서 비밀번호를 한 번 저장해 주세요."; return; }
+    btn.disabled = true;
+    msg.textContent = "AI가 소전을 보고 나누는 중… (10~30초)";
+    try {
+      let image = "";
+      try { image = await sealPng(ch); } catch (e) { /* 그림 없이 */ }
+      const res = await fetch(PHOTO_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Access-Code": code },
+        body: JSON.stringify({ mode: "split", char: ch, image }),
+      });
+      const d = await res.json();
+      if (!res.ok) { msg.textContent = "나누지 못했습니다: " + (d.error || res.status); return; }
+      if (d.mode !== "split") { msg.textContent = "서버(Cloudflare 워커)가 아직 자형 분해 기능이 없는 옛 버전입니다. 새 worker.js로 갱신해 주세요."; return; }
+      try { localStorage.setItem(SKEY + ch, JSON.stringify(d)); } catch (e) { /* 저장 안 됨 */ }
+      try { localStorage.removeItem(XKEY + ch); } catch (e) { /* 분해가 바뀌면 예전 해석은 지움 */ }
+      explain(ch);
+    } catch (e) {
+      msg.textContent = "서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.";
+    } finally { btn.disabled = false; }
+  }
+  // 분해 트리의 한 줄: 기초자 80자 / 고유부호 / 540부수(분해표) / 더 나눈 글자
+  function treeLi(n, depth) {
+    const li = document.createElement("li");
+    const row = document.createElement("div");
+    row.className = "bh-node";
+    const sb = document.createElement("span");
+    sb.className = "bh-sb";
+    const sl = sealEl(n.c);
+    if (sl) sb.appendChild(sl); else sb.innerHTML = '<span class="bh-note">없음</span>';
+    row.appendChild(sb);
+    row.insertAdjacentHTML("beforeend", `<span class="bh-nc">${esc(n.c)}</span>`);
+    li.appendChild(row);
+    const k = kIndex(n.c);
+    if (depth > 0 && k !== undefined) { row.insertAdjacentHTML("beforeend", `<span class="bh-tag sheng">기초자 · ${esc(K[k].hun)}</span>`); return li; }
+    if (depth > 0 && buho(n.c)) { row.insertAdjacentHTML("beforeend", `<span class="bh-tag">고유부호 · ${esc(buho(n.c).mean.join(", "))}</span>`); return li; }
+    const ri = radIndex(n.c);
+    if (ri !== undefined) { row.appendChild(radButton(ri, li, depth === 0)); return li; }
+    if (n.parts && n.parts.length) {
+      const ul = document.createElement("ul");
+      n.parts.forEach((p) => ul.appendChild(treeLi(p, depth + 1)));
+      li.appendChild(ul);
+    } else if (depth > 0) row.insertAdjacentHTML("beforeend", '<span class="bh-note">더 나누지 않음</span>');
+    return li;
+  }
+  function splitButton(ch, label, holder) {
+    const bar = document.createElement("div");
+    bar.className = "buttons";
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = label.startsWith("다시") ? "btn" : "btn primary"; btn.textContent = label;
+    const msg = document.createElement("p");
+    msg.className = "hint";
+    btn.addEventListener("click", () => askSplit(ch, btn, msg));
+    bar.appendChild(btn);
+    holder.append(bar, msg);
+  }
+
+  // ===== 글자 풀이 — 소전이 主, 해서는 附 =====
+  // 근거: 소전 그림(《說文》 표제자 그림·이체·본자)만 씀. 《說文》 원문의 구성 설명은 쓰지 않음.
+  // 기초자 80자 → 540부수(저자 분해표) → 그 밖은 AI가 소전을 보고 나눔.
   async function explain(ch) {
     const card = $("bh-card"), body = $("bh-body");
     card.hidden = false;
-    body.innerHTML = '<p class="hint">說文 자료를 불러오는 중…</p>';
+    body.innerHTML = '<p class="hint">자료를 불러오는 중…</p>';
     card.scrollIntoView({ behavior: "smooth", block: "start" });
-    try { await loadSW(); } catch (e) { body.innerHTML = `<p class="hint">${e.message}</p>`; return; }
+    try { await loadSW(); } catch (e) { /* 이체 연결만 못 씀 */ }
     body.innerHTML = "";
-    if (swEntry(ch) === null || AI_SET.has(ch)) applyJahae(ch, jahaeCached(ch));   // 이 기기에 저장한 AI 자해
-    const ai = AI_SET.has(ch) ? jahaeCached(ch) : null;
-    const e = swEntry(ch);
     const head = document.createElement("div");
     head.className = "bh-head";
     const big = document.createElement("span");
     big.className = "bh-big";
     const sl = sealEl(ch);
     if (sl) big.appendChild(sl); else big.innerHTML = '<span class="bh-note">소전 없음</span>';
-    const via = BH_VAR[ch] && BH_SW.idx[ch] === undefined ? ` <span class="bh-note">(說文에는 ${BH_VAR[ch]}로 수록)</span>` : "";
+    const so = SEALOF[ch];
+    const via = so ? ` <span class="bh-note">(${so[1] === "本" ? "본자" : so[1] === "古" ? "고문" : so[1] === "重" ? "重文" : "이체자"} ${esc(so[0])}의 소전)</span>`
+      : (window.BH_VAR && BH_VAR[ch] && !(window.SHUOWEN && SHUOWEN[ch]) ? ` <span class="bh-note">(${esc(BH_VAR[ch])}의 소전)</span>` : "");
     head.appendChild(big);
     head.insertAdjacentHTML("beforeend", `<div><div class="bh-ch">${ch}${via}</div><div class="bh-hun">${huneumOf(ch) || ""}</div></div>`);
     body.appendChild(head);
 
-    if (!e && BOOK[ch] === undefined) {
-      const box = document.createElement("div");
-      box.className = "bh-basic bh-jahae";
-      box.insertAdjacentHTML("beforeend", '<p class="bh-say">《說文解字》 표제자에서 바로 찾지 못한 글자입니다. 說文에 이체(古文·篆文 등)로 실렸거나 《說文》 이후에 생긴 글자일 수 있습니다.</p>' +
-        '<p class="bh-say"><b>AI로 자해하기</b>를 누르면 AI가 이 글자를 기초자 80자와 고유부호로 나눠 그 뜻으로 해석하고, 나눈 구성요소부터 자형 분해와 기초자 해독으로 이어서 보여 드립니다.</p>');
-      const bar = document.createElement("div");
-      bar.className = "buttons";
-      const btn = document.createElement("button");
-      btn.type = "button"; btn.className = "btn primary"; btn.textContent = "AI로 자해하기";
-      const msg = document.createElement("p");
-      msg.className = "hint";
-      btn.addEventListener("click", () => askJahae(ch, btn, msg));
-      bar.appendChild(btn);
-      box.append(bar, msg);
-      body.appendChild(box);
-    }
-    if (ai) body.appendChild(step("AI 자형 해석 — 기초자 80자로 읽기", true, (b) => b.appendChild(jahaeBlock(ch, ai, ""))));
-    const ki = KBYCH[ch] ?? (BH_VAR[ch] !== undefined ? KBYCH[BH_VAR[ch]] : undefined);
-    if (ki !== undefined) body.appendChild(step(`기초자 설명 — ${K[ki].hun}`, false, (b) => b.appendChild(basicBlock(K[ki]))));
-    if (e || BOOK[ch] !== undefined) {
-      body.appendChild(step(ai ? "자형 분해 — AI가 나눈 구성요소부터" : "자형 분해", ki === undefined && !ai, (b) => {
+    const ki = kIndex(ch);
+    const ri = radIndex(ch);
+    const sp = splitCached(ch);
+    if (ki !== undefined) body.appendChild(step(`기초자 설명 — ${K[ki].hun}`, true, (b) => b.appendChild(basicBlock(K[ki]))));
+
+    // 자형 분해
+    body.appendChild(step("자형 분해", ki === undefined, (b) => {
+      if (ki !== undefined) {
+        b.insertAdjacentHTML("beforeend", '<p class="bh-say">기초자 80자입니다. 더 나누지 않고 기초자의 뜻을 그대로 씁니다.</p>');
+        if (ri !== undefined) b.appendChild(chartFor(ri));
+        return;
+      }
+      if (ri !== undefined) {
         const ul = document.createElement("ul");
         ul.className = "bh-tree";
-        ul.appendChild(nodeLi(BH_VAR[ch] && BH_SW.idx[ch] === undefined ? BH_VAR[ch] : ch, null, 0, new Set()));
+        ul.appendChild(treeLi({ c: ch, parts: [] }, 0));
         b.appendChild(ul);
-        b.insertAdjacentHTML("beforeend", '<div class="bh-src">부수까지 나누는 단계는 《說文》의 구성(从○○聲)을 따라 자동으로 만든 것이고, 분해표는 540부수에 대한 저자의 분해입니다.</div>');
-      }));
-      // 마지막 단계: 기본자형의 뜻으로 훈 만들기
-      const root = BH_VAR[ch] && BH_SW.idx[ch] === undefined ? BH_VAR[ch] : ch;
-      body.appendChild(step("소전 해독 — 기본자형의 뜻으로 훈 만들기", false, (b) => b.appendChild(decodeBlock(ch, root))));
-    }
-    // 說文 표제자 글자: 기본 부호를 틀로 한 AI 자형 해석 (說文 구성을 함께 보내 그대로 따르게 함)
-    if (e && !ai) {
-      const known = e[3].map(([c, r]) => `${c}(${ROLE[r] || r})`).join(" + ") || "더 나누지 않음(象形·指事 등)";
+        b.insertAdjacentHTML("beforeend", '<div class="bh-src">540부수입니다. 저자(최규화)의 분해표가 기준이며, 아래 「AI 자형 해석」이 분해표에서 기초자를 찾아 풀이합니다.</div>');
+        return;
+      }
+      if (sp && sp.tree) {
+        const ul = document.createElement("ul");
+        ul.className = "bh-tree";
+        ul.appendChild(treeLi(sp.tree, 0));
+        b.appendChild(ul);
+        b.insertAdjacentHTML("beforeend", `<div class="bh-src">AI가 소전 그림을 보고 기초자 80자·540부수·고유부호에 닿을 때까지 나눈 것입니다${sp.sure === false ? " — <b>AI도 확신하지 못함</b>" : ""}.${sp.note ? " " + esc(sp.note) : ""} 540부수는 저자의 분해표가 기준입니다. 이 기기에 저장됩니다.</div>`);
+        splitButton(ch, "다시 나누기", b);
+        return;
+      }
+      b.insertAdjacentHTML("beforeend", '<p class="bh-say">이 글자는 기초자 80자도 540부수도 아닙니다. <b>AI로 자형 분해하기</b>를 누르면 AI가 이 글자의 소전 그림을 보고 기초자 80자·540부수·고유부호에 닿을 때까지 나눕니다. 《說文》의 구성 설명은 쓰지 않습니다.</p>');
+      splitButton(ch, "AI로 자형 분해하기", b);
+    }));
+
+    // 소전 해독과 AI 자형 해석 — 기본자형을 모을 수 있을 때
+    if (ki !== undefined || ri !== undefined || (sp && sp.tree)) {
+      body.appendChild(step("소전 해독 — 기본자형의 뜻으로 훈 만들기", false, (b) => b.appendChild(decodeBlock(ch, ch))));
       const saved = jxCached(ch);
-      const root = rootOf(ch);
       body.appendChild(step("AI 자형 해석 — 자형 분해도의 기초자로 읽기", !!saved, (b) => {
-        if (saved) { b.appendChild(jahaeBlock(ch, saved, known)); return; }
-        b.insertAdjacentHTML("beforeend", `<p class="bh-say">AI가 위 <b>자형 분해도에서 나온 기본자형</b>(${esc(leafPayload(root).map((l) => l.c).join(" · "))})과 그 <b>기초자 80자 뜻</b>만으로, 「한자 원리」(방향·결설 구조·유형)에 따라 소전을 해석합니다. 구성요소를 더 나누지 않고, 《說文》의 풀이는 따르지 않습니다.</p>`);
+        if (saved) { b.appendChild(jahaeBlock(ch, saved, "저자")); return; }
+        b.insertAdjacentHTML("beforeend", `<p class="bh-say">AI가 위 <b>자형 분해에서 나온 기본자형</b>(${esc(leafPayload(ch).map((l) => l.c).join(" · "))})과 그 <b>기초자 80자 설명</b>만으로, 「한자 원리」(방향·결설 구조·유형)에 따라 소전을 해석합니다.</p>`);
         const bar = document.createElement("div");
         bar.className = "buttons";
         const btn = document.createElement("button");
         btn.type = "button"; btn.className = "btn primary"; btn.textContent = "AI로 자형 해석하기";
         const msg = document.createElement("p");
         msg.className = "hint";
-        btn.addEventListener("click", () => askJahae(ch, btn, msg, known, leafPayload(root)));
+        btn.addEventListener("click", () => askJahae(ch, btn, msg, "저자", leafPayload(ch)));
         bar.appendChild(btn);
         b.append(bar, msg);
       }));
@@ -540,10 +600,8 @@
             holder.appendChild(chartFor(ri));
             b.appendChild(holder);
           } else {
-            const ul = document.createElement("ul");
-            ul.className = "bh-tree";
-            ul.appendChild(nodeLi(ch, null, 0, new Set()));
-            b.appendChild(ul);
+            // 540부수가 아닌 기초자: 구성은 책의 자세한 설명(구성:)을 따름 — 《說文》 구성 설명은 쓰지 않음
+            b.insertAdjacentHTML("beforeend", `<p class="bh-say">${esc(ch)}는 540부수가 아닙니다. 구성은 위 「자세한 설명」의 <b>구성</b>을 보세요.</p>`);
           }
         });
       }));
@@ -588,6 +646,57 @@
       document.getElementById("btn-convert").click();
       inp.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+  }
+
+  // ===== 소전 1800: 교육용 기초한자를 부수별로, 소전 중심 =====
+  function s1800Group(g) {
+    const [rad, no, sealRad, items] = g;
+    const det = document.createElement("details");
+    det.className = "s1800-g";
+    const sum = document.createElement("summary");
+    const sb = document.createElement("span");
+    sb.className = "bh-sb";
+    const sl = sealEl(sealRad);
+    if (sl) sb.appendChild(sl);
+    sum.appendChild(sb);
+    sum.insertAdjacentHTML("beforeend", `<span class="s1800-gname">${rad}</span><span class="s1800-gcount">${items.length}자</span>`);
+    det.appendChild(sum);
+    let drawn = false;
+    det.addEventListener("toggle", () => {
+      if (!det.open || drawn) return;
+      drawn = true;
+      const grid = document.createElement("div");
+      grid.className = "s100-grid s1800-grid";
+      items.forEach(([c, s, t]) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "s100-cell" + (t === "無" ? " s1800-none" : "");
+        const box = document.createElement("span");
+        box.className = "s100-seal";
+        const e = sealEl(c);
+        if (e) box.appendChild(e); else box.innerHTML = '<span class="bh-note">소전 없음</span>';
+        b.appendChild(box);
+        const mark = t ? `<i class="s1800-t">${t}${s ? " " + s : ""}</i>` : "";
+        b.insertAdjacentHTML("beforeend", `<span class="s100-ks"><b>${c}</b></span><span class="s100-meta">${(huneumOf(c).split(",")[0] || "").trim()}</span>${mark}`);
+        b.title = t ? ({ "重": "說文 重文", "異": "이체자", "本": "본자(옛 꼴)", "古": "고문", "字": "소전 글꼴", "無": "소전 없음" })[t] + (s ? " " + s + "의 소전" : "") : "說文 표제자";
+        b.addEventListener("click", () => explain(c));
+        grid.appendChild(b);
+      });
+      det.appendChild(grid);
+    });
+    return det;
+  }
+  let s1800Drawn = false;
+  if ($("s1800")) {
+    $("s1800").addEventListener("toggle", () => {
+      if (!$("s1800").open || s1800Drawn) return;
+      s1800Drawn = true;
+      (window.BH_S1800 || []).forEach((g) => $("s1800-groups").appendChild(s1800Group(g)));
+    });
+    const openByHash1800 = () => {
+      if (location.hash === "#s1800") { $("s1800").open = true; setTimeout(() => $("s1800").scrollIntoView({ behavior: "smooth", block: "start" }), 300); }
+    };
+    openByHash1800();
+    window.addEventListener("hashchange", openByHash1800);
   }
 
   // ===== 기본 부호 참고 칸 =====

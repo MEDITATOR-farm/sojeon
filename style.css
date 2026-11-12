@@ -484,3 +484,14 @@ input[type="text"].bh-q { height: 48px; font-size: 1.1rem; margin-bottom: 10px; 
 .s100-ks small { margin-left: 3px; font-size: .75rem; }
 .s100-meta { font-size: .68rem; color: var(--muted); }
 .s100-src { margin-top: 6px; font-size: .75rem; }
+
+/* 소전 1800 */
+.s1800-g { border-top: 1px solid var(--line); padding: 4px 0; }
+.s1800-g > summary { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 4px 0; list-style: none; }
+.s1800-g > summary::-webkit-details-marker { display: none; }
+.s1800-gname { font-size: 1.1rem; }
+.s1800-gcount { font-size: .8rem; color: var(--muted); }
+.s1800-grid { margin: 6px 0 10px; }
+.s1800-t { font-style: normal; font-size: .62rem; color: var(--gold); }
+.s1800-none { opacity: .6; }
+.s1800-legend { font-size: .75rem; }
