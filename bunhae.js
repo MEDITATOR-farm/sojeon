@@ -125,6 +125,20 @@
       [k.d1, k.d2].filter(Boolean).forEach((t) => box.insertAdjacentHTML("beforeend", `<p class="bh-say">${t}</p>`));
     }
     box.insertAdjacentHTML("beforeend", '<div class="bh-src">출처: 한자해례 채널 「기초자81」 영상(최규화) — 화면 글자와 자동 자막을 옮김</div>');
+    // 책의 자세한 설명 (『한자해례 1800+』 「기초자 80」) — AI 자해의 바탕과 같은 내용
+    const D = window.BH_K80DET || {};
+    const det = k.chars.map((c) => D[c]).find(Boolean) || (k.hun.includes("길짐승") ? D["𠂹"] : k.hun.includes("날짐승") ? D["날짐승"] : null);
+    if (det) {
+      const d = document.createElement("details");
+      d.className = "bh-step";
+      d.open = true;
+      const lines = det.text.split("\n").map((t) => {
+        const e = t.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+        return /^(구성|풀이|▶|說|\[참고\])/.test(t) ? `<p class="bh-say">${e.replace(/^(구성:|풀이:|▶|說:|\[참고\])/, "<b>$1</b>")}</p>` : `<p class="bh-say">${e}</p>`;
+      }).join("");
+      d.innerHTML = `<summary>자세한 설명 — 『한자해례 1800+』 기초자 80</summary><div class="bh-step-body">${lines}<div class="bh-src">출처: 최규화, 『한자해례 1800+』(도서출판 한자해례) 「기초자 80」. 저자의 허락을 받아 옮겼습니다(사진·도판은 빼고 일부는 줄여 옮김).</div></div>`;
+      box.appendChild(d);
+    }
     return box;
   }
 
@@ -160,7 +174,13 @@
   }
   function meaningWords(k) {
     const src = k.scr || k.say || "";
-    return src.split(/\s*[\/,，.。]\s*|\s*\d+\.\s*|\s*=\s*/).map((x) => x.trim()).filter((x) => x && x.length <= 12);
+    const vid = src.split(/\s*[\/,，.。]\s*|\s*\d+\.\s*|\s*=\s*/).map((x) => x.trim()).filter((x) => x && x.length <= 12);
+    // 책(『한자해례 1800+』 기초자 80)의 ▶ 뜻 낱말도 함께
+    const D = window.BH_K80DET || {};
+    const det = k.chars.map((c) => D[c]).find(Boolean);
+    const book = det ? det.text.split("\n").filter((t) => t.startsWith("▶")).join(", ").replace(/▶/g, "").split(/\s*[,/]\s*/)
+      .map((x) => x.replace(/^[^:]*:\s*/, "").replace(/\(.*?\)/g, "").trim()).filter((x) => x && x.length <= 12) : [];
+    return [...new Set([...vid, ...book])];
   }
   function hunKey(ch) { return "sojeon-hun-" + ch; }
   function loadHun(ch) { try { return localStorage.getItem(hunKey(ch)) || ""; } catch (e) { return ""; } }
