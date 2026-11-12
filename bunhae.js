@@ -576,6 +576,12 @@
   }
   if ($("s100")) {
     $("s100").addEventListener("toggle", () => { if ($("s100").open && !s100Drawn) { s100Drawn = true; drawS100(); } });
+    // 주소 끝이 #s100이면 바로 펼쳐서 보여 줌 (예: …/sojeon/#s100)
+    const openByHash = () => {
+      if (location.hash === "#s100") { $("s100").open = true; setTimeout(() => $("s100").scrollIntoView({ behavior: "smooth", block: "start" }), 300); }
+    };
+    openByHash();
+    window.addEventListener("hashchange", openByHash);
     $("s100-send").addEventListener("click", () => {
       const inp = document.getElementById("input");
       inp.value = (window.BH_S100 || []).map((r) => r[2]).join("");
