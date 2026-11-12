@@ -266,7 +266,16 @@
   // AI(사진 읽기와 같은 서버, mode "jahae")가 자원(字源)에 따른 구성요소를 주면, 그 구성을 임시 說文 항목으로 넣어
   // 아래의 자형 분해(說文 트리)·소전 해독(기초자)을 그대로 이어서 씀. 결과는 이 기기에 저장해 다음부터는 무료.
   const JKEY = "sojeon-jahae2-";   // 2: 기초자 80자 기준 해석(說文 따르지 않음). 예전 說文 기준 결과(sojeon-jahae-)는 쓰지 않음
-  const XKEY = "sojeon-jx2-";        // 說文 표제자 글자의 AI 자형 해석 (분해 트리는 說文 그대로 두고 해석만 덧붙임)
+  const XKEY = "sojeon-jx3-";      // 3: 자형 분해도의 기본자형(기초자 80자 뜻)으로 해석
+  // 자형 분해도에서 찾은 기본자형과 그 뜻 — AI에게 보내 이것만으로 해석하게 함
+  function rootOf(ch) { return BH_VAR[ch] && BH_SW.idx[ch] === undefined ? BH_VAR[ch] : ch; }
+  function leafPayload(root) {
+    return basicLeaves(root, "", 0, new Set(), "").map((l) => {
+      if (l.k !== undefined) { const k = K[l.k]; return { c: l.ch, kind: "기초자", hun: k.hun, mean: k.scr || "", say: k.say || "" }; }
+      if (l.b) return { c: l.ch, kind: "부호", hun: l.b.hun, mean: buhoWords(l.b).join(", ") };
+      return { c: l.ch, kind: "기타", hun: huneumOf(l.ch) || "" };
+    });
+  }        // 說文 표제자 글자의 AI 자형 해석 (분해 트리는 說文 그대로 두고 해석만 덧붙임)
   function jxCached(ch) { try { return JSON.parse(localStorage.getItem(XKEY + ch) || "null"); } catch (e) { return null; } }
   const AI_SET = new Set();
   function jahaeCached(ch) { try { return JSON.parse(localStorage.getItem(JKEY + ch) || "null"); } catch (e) { return null; } }
@@ -281,7 +290,7 @@
     if (known) return;
     if (AI_SET.has(ch)) { delete BH_SW.idx[ch]; AI_SET.delete(ch); }
   }
-  async function askJahae(ch, btn, msg, known) {
+  async function askJahae(ch, btn, msg, known, leaves) {
     const code = typeof phGetCode === "function" ? phGetCode() : "";
     if (!code) { msg.textContent = "AI 비밀번호가 없습니다. 위의 「사진으로 찾기」에서 비밀번호를 한 번 저장해 주세요."; return; }
     btn.disabled = true;
@@ -290,7 +299,7 @@
       const res = await fetch(PHOTO_API, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Access-Code": code },
-        body: JSON.stringify({ mode: "jahae", char: ch }),   // 《說文》 구성은 보내지 않음 — AI는 기초자 80자로만 해석
+        body: JSON.stringify(leaves ? { mode: "jahae", char: ch, leaves } : { mode: "jahae", char: ch }),
       });
       const d = await res.json();
       if (!res.ok) { msg.textContent = "풀이하지 못했습니다: " + (d.error || res.status); return; }
@@ -307,13 +316,13 @@
     const box = document.createElement("div");
     box.className = "bh-basic bh-jahae";
     const f = d.parts.map((p) => `${esc(p.c)}(${esc(p.mean || "")}${isSound(p.role) ? "·소리" : ""})`).join(" + ");
-    box.insertAdjacentHTML("beforeend", `<p class="bh-say bh-formula">${esc(ch)} = ${f}</p>`);
+    if (d.parts && d.parts.length) box.insertAdjacentHTML("beforeend", `<p class="bh-say bh-formula">${esc(ch)} = ${f}</p>`);
     if (d.kicho) box.insertAdjacentHTML("beforeend", `<div class="bh-h4">기초자로 나누기</div><p class="bh-say bh-formula">${esc(d.kicho)}</p>`);
     if (d.jx) box.insertAdjacentHTML("beforeend", `<div class="bh-h4">자형 해석 — 기초자·고유부호·결설 구조</div><p class="bh-say">${esc(d.jx)}</p>`);
     if (d.sori) box.insertAdjacentHTML("beforeend", `<div class="bh-h4">소리</div><p class="bh-say">${esc(d.sori)}</p>`);
     if (d.hun) box.insertAdjacentHTML("beforeend", `<p class="bh-say">훈: <b>${esc(d.hun)}</b></p>`);
     if (d.note) box.insertAdjacentHTML("beforeend", `<p class="bh-say bh-note">${esc(d.note)}</p>`);
-    box.insertAdjacentHTML("beforeend", `<div class="bh-src">AI(Claude)가 기초자 80자와 『한자해례 1800+』 「한자 원리」(최규화)만으로 해석한 것입니다(《說文》 풀이는 따르지 않음)${d.sure === false ? " — <b>기초자로 깔끔하게 나눠지지 않아 AI도 확신하지 못한 해석</b>" : ""}. 저자의 해석과 다를 수 있으니 확인해 주세요.${known ? "" : " 아래 자형 분해는 AI가 나눈 구성요소에서부터 이어 갑니다."}</div>`);
+    box.insertAdjacentHTML("beforeend", `<div class="bh-src">AI(Claude)가 ${known ? "자형 분해도의 기본자형과 그 " : ""}기초자 80자 뜻, 『한자해례 1800+』 「한자 원리」(최규화)만으로 해석한 것입니다(《說文》 풀이는 따르지 않음)${d.sure === false ? " — <b>기초자로 깔끔하게 나눠지지 않아 AI도 확신하지 못한 해석</b>" : ""}. 저자의 해석과 다를 수 있으니 확인해 주세요.${known ? "" : " 아래 자형 분해는 AI가 나눈 구성요소에서부터 이어 갑니다."}</div>`);
     const bar = document.createElement("div");
     bar.className = "buttons";
     const again = document.createElement("button");
@@ -322,7 +331,7 @@
     del.type = "button"; del.className = "btn"; del.textContent = "풀이 지우기";
     const msg = document.createElement("p");
     msg.className = "hint";
-    again.addEventListener("click", () => askJahae(ch, again, msg, known));
+    again.addEventListener("click", () => askJahae(ch, again, msg, known, known ? leafPayload(rootOf(ch)) : null));
     del.addEventListener("click", () => { dropJahae(ch, !!known); explain(ch); });
     bar.append(again, del);
     box.append(bar, msg);
@@ -387,16 +396,17 @@
     if (e && !ai) {
       const known = e[3].map(([c, r]) => `${c}(${ROLE[r] || r})`).join(" + ") || "더 나누지 않음(象形·指事 등)";
       const saved = jxCached(ch);
-      body.appendChild(step("AI 자형 해석 — 기초자 80자로 읽기", !!saved, (b) => {
+      const root = rootOf(ch);
+      body.appendChild(step("AI 자형 해석 — 자형 분해도의 기초자로 읽기", !!saved, (b) => {
         if (saved) { b.appendChild(jahaeBlock(ch, saved, known)); return; }
-        b.insertAdjacentHTML("beforeend", `<p class="bh-say">AI가 이 글자를 <b>기초자 80자</b>와 고유부호로 나누고, 「한자 원리」(방향·결설 구조·유형)에 따라 그 뜻으로 소전을 해석합니다. 《說文》의 구성과 풀이는 따르지 않습니다.</p>`);
+        b.insertAdjacentHTML("beforeend", `<p class="bh-say">AI가 위 <b>자형 분해도에서 나온 기본자형</b>(${esc(leafPayload(root).map((l) => l.c).join(" · "))})과 그 <b>기초자 80자 뜻</b>만으로, 「한자 원리」(방향·결설 구조·유형)에 따라 소전을 해석합니다. 구성요소를 더 나누지 않고, 《說文》의 풀이는 따르지 않습니다.</p>`);
         const bar = document.createElement("div");
         bar.className = "buttons";
         const btn = document.createElement("button");
         btn.type = "button"; btn.className = "btn primary"; btn.textContent = "AI로 자형 해석하기";
         const msg = document.createElement("p");
         msg.className = "hint";
-        btn.addEventListener("click", () => askJahae(ch, btn, msg, known));
+        btn.addEventListener("click", () => askJahae(ch, btn, msg, known, leafPayload(root)));
         bar.appendChild(btn);
         b.append(bar, msg);
       }));

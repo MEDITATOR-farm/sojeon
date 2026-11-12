@@ -193,6 +193,7 @@ ${BUHO}
 순서:
 1. parts: 소전 모양을 보고 바로 아래 단계의 구성요소로 나눕니다. 구성요소는 되도록 기초자 80자나 고유부호(一 丨 丿 乀 囗 凵 冖 匚)이고,
    기초자가 아닌 글자가 들어가면 그 글자도 다시 기초자로 나눌 수 있는 글자여야 합니다.
+   기초자나 고유부호에 이르면 거기서 멈추고 더 잘게 나누지 않습니다(세분하면 뜻이 엉뚱해집니다).
    - c: 구성요소 한 글자(유니코드).
    - role: 항상 "" (소리·뜻 구분을 하지 않음).
    - mean: 위 목록에서 이 글자에 맞는 뜻 낱말을 골라 한국어로 짧게.
@@ -208,6 +209,41 @@ ${BUHO}
 
 답은 아래 JSON 하나만 출력합니다.
 {"parts":[{"c":"厂","role":"","mean":"언덕"},{"c":"泉","role":"","mean":"샘"}],"kicho":"","jx":"","sori":"","hun":"","sure":true,"note":""}`;
+
+// 자형 분해도의 기본자형으로 해석 — 사이트가 자형 분해도에서 찾은 기본자형과 그 기초자 80자 뜻을 보내면,
+// AI는 구성요소를 더 나누거나 바꾸지 않고 그 뜻만으로 소전을 해석함 (세분하면 뜻이 엉뚱해지는 오류를 막음)
+const LEAF_PROMPT = `한자 「CHAR」의 소전 자형을 해석해 주세요.
+
+[가장 중요한 규칙]
+- 이 글자의 구성요소는 아래 [자형 분해도의 기본자형]으로 이미 정해져 있습니다. 더 잘게 나누거나, 빼거나, 다른 글자로 바꾸지 않습니다.
+- 각 기본자형의 뜻은 함께 적힌 기초자 80자의 뜻(뜻 낱말·풀이)에서만 고릅니다. 목록에 없는 뜻을 지어내지 않습니다.
+- 《說文解字》의 풀이와 통설·자전 풀이는 따르지 않습니다. 소리 요소도 뜻을 가진 기본자형으로 읽습니다.
+- 목록의 순서는 쓰는 순서가 아닙니다. 소전에서 놓인 자리를 보고 결설 순서(먼저 쓴 것이 결과, 뒤가 설명)를 정합니다.
+
+[자형 분해도의 기본자형]
+LEAVES
+
+${BUHO}
+
+순서:
+1. kicho: 기본자형을 결설 순서로 놓고 각 요소에 고른 뜻을 붙입니다. 예: "宀(움집) + 女(출산·양육)".
+2. jx: 그 뜻들과 방향·위치·유형(동작·방향·복수·마주보기·품기·맴돌기·생략)으로 글자가 보여 주는 장면을 풀이하고, 그 장면에서 글자의 뜻이 나오는 과정을 한국어 3~5문장으로 씁니다.
+3. hun: 해석에서 나온 뜻을 담은 훈과 음(예: "편안할 안").
+4. 기초자 뜻이 없는 요소("기초자 아님")는 그 글자의 일반적인 훈으로만 짧게 다루고, 해석이 억지스러우면 note에 솔직히 쓰고 sure를 false로 합니다.
+
+답은 아래 JSON 하나만 출력합니다.
+{"parts":[],"kicho":"","jx":"","sori":"","hun":"","sure":true,"note":""}`;
+
+function leafText(leaves) {
+  return leaves.slice(0, 12).map((l) => {
+    const t = (v, n) => String(v || "").replace(/[`$\\]/g, "").slice(0, n);
+    const c = Array.from(t(l.c, 4))[0] || "";
+    if (!c) return "";
+    if (l.kind === "기초자") return `${c} (기초자, ${t(l.hun, 20)}): ${t(l.mean, 160)}${l.say ? " | " + t(l.say, 200) : ""}`;
+    if (l.kind === "부호") return `${c} (고유부호, ${t(l.hun, 20)}): ${t(l.mean, 160)}`;
+    return `${c} (기초자 아님, 훈음 ${t(l.hun, 30)})`;
+  }).filter(Boolean).join("\n");
+}
 
 const ROLES = ["", "聲", "亦聲", "省", "省聲"];
 export function extractJahae(text) {
@@ -285,7 +321,9 @@ export default {
     // 자해 모드: 그림 없이 글자 하나만
     if (body.mode === "jahae") {
       const ch = Array.from(String(body.char || ""))[0] || "";
-      const prompt = JAHAE_PROMPT.replace("CHAR", ch);   // 《說文》 구성은 보내지 않음(따르지 않음)
+      // 자형 분해도의 기본자형이 오면 그것만으로 해석, 없으면(분해도가 없는 글자) AI가 기초자로 나눔
+      const leaves = Array.isArray(body.leaves) ? leafText(body.leaves) : "";
+      const prompt = leaves ? LEAF_PROMPT.replace("CHAR", ch).replace("LEAVES", leaves) : JAHAE_PROMPT.replace("CHAR", ch);
       if (!/\p{Script=Han}/u.test(ch)) return reply({ error: "한자 한 글자를 보내 주세요" }, 400, h);
       const r = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
