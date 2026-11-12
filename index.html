@@ -69,7 +69,14 @@
         <div class="buttons hw-buttons">
           <button type="button" id="sd-undo" class="btn">한 획 지우기</button>
           <button type="button" id="sd-clear" class="btn">모두 지우기</button>
+          <button type="button" id="sd-ai" class="btn primary">AI로 읽기</button>
         </div>
+        <div id="sd-code-row" class="ph-code-row" hidden>
+          <input type="password" id="sd-code" class="ph-code" placeholder="AI 읽기 비밀번호 (사진 읽기와 같음)" autocomplete="off">
+          <button type="button" id="sd-code-save" class="btn">저장</button>
+        </div>
+        <p id="sd-ai-status" class="hint" hidden></p>
+        <div id="sd-ai-list" class="rs-grid" hidden></div>
         <p id="sd-count" class="hint">소전을 그리면 비슷한 글자를 찾아 드립니다</p>
         <div id="sd-list" class="rs-grid"></div>
       </details>

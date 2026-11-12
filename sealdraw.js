@@ -11,7 +11,7 @@
   const list = document.getElementById("sd-list");
   const status = document.getElementById("sd-count");
   const N = 64, D = 16, DIM = 320, SCALE = 0.6 / 255;
-  let feats = null, loading = null, strokes = [], cur = null;
+  let feats = null, loading = null, strokes = [], cur = null, lastTop = [];
 
   function load() {
     if (feats) return Promise.resolve();
@@ -154,7 +154,7 @@
     if (Math.abs(p[0] - l[0]) + Math.abs(p[1] - l[1]) < 2) return;
     cur.push(p); draw();
   });
-  const end = () => { if (!cur) return; strokes.push(cur); cur = null; draw(); search(); };
+  const end = () => { if (!cur) return; strokes.push(cur); cur = null; draw(); search(); if (!aiList.hidden || !aiStatus.hidden) aiReset(); };
   canvas.addEventListener("pointerup", end);
   canvas.addEventListener("pointercancel", end);
 
@@ -179,6 +179,7 @@
       if (!prev || prev[0] < s) best.set(ch, [s, i]);
     }
     const top = [...best.entries()].sort((a, b) => b[1][0] - a[1][0]).slice(0, 24);
+    lastTop = top.map(([ch]) => ch);
     top.forEach(([ch, [, i]]) => {
       const [, p, k, z] = SHUOWEN_ROWS[i];
       const b = document.createElement("button");
@@ -195,8 +196,85 @@
     status.textContent = `${strokes.length}획 · 모양이 비슷한 소전 ${top.length}자 (앞쪽일수록 비슷함) · 소전 그림을 보고 맞는 글자를 누르세요`;
   }
 
-  document.getElementById("sd-undo").addEventListener("click", () => { strokes.pop(); draw(); search(); });
-  document.getElementById("sd-clear").addEventListener("click", () => { strokes = []; draw(); search(); });
+  // ---- AI로 읽기: 그린 소전을 흰 바탕 그림으로 만들어 사진 읽기 서버(mode "sealhw")로 보냄 ----
+  // 모양 비교로 찾은 상위 후보도 참고로 함께 보내 정확도를 높임. 한 번에 몇 원 정도의 API 요금이 듦.
+  const aiBtn = document.getElementById("sd-ai");
+  const aiStatus = document.getElementById("sd-ai-status");
+  const aiList = document.getElementById("sd-ai-list");
+  const codeRow = document.getElementById("sd-code-row");
+  let aiSeq = 0;
+  function aiReset() { aiSeq++; aiStatus.hidden = true; aiList.hidden = true; aiList.innerHTML = ""; aiBtn.disabled = false; }
+  function sealImage() {
+    const pts = strokes.flat();
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const N = 256, k = 200 / Math.max(x1 - x0, y1 - y0, 40);
+    const ox = (N - (x1 - x0) * k) / 2 - x0 * k, oy = (N - (y1 - y0) * k) / 2 - y0 * k;
+    const c = document.createElement("canvas");
+    c.width = c.height = N;
+    const g = c.getContext("2d");
+    g.fillStyle = "#fff"; g.fillRect(0, 0, N, N);
+    g.strokeStyle = "#000"; g.lineWidth = 8; g.lineCap = g.lineJoin = "round";
+    strokes.forEach((st) => {
+      g.beginPath();
+      st.forEach(([x, y], i) => (i ? g.lineTo(x * k + ox, y * k + oy) : g.moveTo(x * k + ox, y * k + oy)));
+      if (st.length === 1) g.lineTo(st[0][0] * k + ox + 0.1, st[0][1] * k + oy);
+      g.stroke();
+    });
+    return c.toDataURL("image/png").split(",")[1];
+  }
+  async function aiRead() {
+    if (!strokes.length) { aiStatus.hidden = false; aiStatus.textContent = "먼저 위 칸에 소전을 그려 주세요."; return; }
+    const code = phGetCode();
+    if (!code) { codeRow.hidden = false; aiStatus.hidden = false; aiStatus.textContent = "처음 한 번만 AI 읽기 비밀번호를 입력해 주세요. (사진 읽기와 같은 비밀번호)"; return; }
+    codeRow.hidden = true;
+    const seq = ++aiSeq;
+    aiBtn.disabled = true; aiList.hidden = true; aiList.innerHTML = "";
+    aiStatus.hidden = false; aiStatus.textContent = "AI가 그린 소전을 읽는 중… (5~15초)";
+    let data;
+    try {
+      const res = await fetch(PHOTO_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Access-Code": code },
+        body: JSON.stringify({ image: sealImage(), mediaType: "image/png", mode: "sealhw", hints: lastTop.slice(0, 12) }),
+      });
+      data = await res.json();
+      if (seq !== aiSeq) return;
+      if (!res.ok) {
+        if (data.code === "bad_code") { phSetCode(""); codeRow.hidden = false; }
+        aiStatus.textContent = "읽지 못했습니다: " + (data.error || res.status);
+        return;
+      }
+    } catch (e) {
+      if (seq !== aiSeq) return;
+      aiStatus.textContent = "서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.";
+      return;
+    } finally { if (seq === aiSeq) aiBtn.disabled = false; }
+    if (data.mode && data.mode !== "sealhw") {
+      aiStatus.textContent = "서버(Cloudflare 워커)가 아직 소전 그리기 읽기 기능이 없는 옛 버전입니다. 새 worker.js로 갱신해 주세요.";
+      return;
+    }
+    const x = (data.columns[0] || [])[0];
+    const cands = x ? [...new Set([x.c, ...(x.alt || [])])].filter((ch) => ch && ch !== "?") : [];
+    if (!cands.length) { aiStatus.textContent = "소전으로 읽지 못했습니다. 조금 더 크고 또박또박 그려 보세요."; return; }
+    aiStatus.innerHTML = `AI가 읽은 글자 <span class="rs-sub">(${x.sure ? "첫 글자가 가장 유력" : "확실하지 않음 — 소전 그림과 비교해 보세요"} · ◎는 모양 비교에도 나온 글자 · 누르면 입력됩니다)</span>`;
+    cands.forEach((ch, i) => {
+      const b = rsButton({ ch });
+      if (i === 0 && x.sure) b.classList.add("ai-best");
+      if (lastTop.includes(ch)) b.classList.add("sd-both");
+      aiList.appendChild(b);
+    });
+    aiList.hidden = false;
+  }
+  aiBtn.addEventListener("click", aiRead);
+  document.getElementById("sd-code-save").addEventListener("click", () => {
+    const v = document.getElementById("sd-code").value.trim();
+    if (!v) return;
+    phSetCode(v); document.getElementById("sd-code").value = ""; codeRow.hidden = true; aiRead();
+  });
+
+  document.getElementById("sd-undo").addEventListener("click", () => { strokes.pop(); draw(); search(); aiReset(); });
+  document.getElementById("sd-clear").addEventListener("click", () => { strokes = []; draw(); search(); aiReset(); });
   box.addEventListener("toggle", () => { if (box.open) { resize(); load(); } });
   window.addEventListener("resize", () => { if (box.open) resize(); });
   window.SD = { feature }; // 시험용

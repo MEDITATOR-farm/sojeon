@@ -43,6 +43,20 @@ const SEAL_PROMPT = `이 사진은 소전(小篆)이나 전각(篆刻)으로 쓴
 {"direction":"vertical 또는 horizontal","columns":[[{"c":"瞑","sure":true},{"c":"想","sure":false,"alt":["相"],"note":""}]]}
 columns는 줄(인장은 세로줄) 하나가 배열 하나입니다.`;
 
+// 손으로 그린 소전 읽기 — 사이트의 '소전을 그려서 찾기' 칸에 그린 소전 한 글자
+const SEALHW_PROMPT = `이 그림은 사람이 손가락이나 펜으로 그린 소전(小篆) 한 글자입니다(흰 바탕에 검은 획). 《說文解字》 소전을 보고 따라 그렸을 가능성이 큽니다.
+어떤 글자인지 읽어 주세요.
+
+규칙:
+1. 손으로 그려 획이 비뚤거나 끊기고 비율이 어긋날 수 있으니 전체 구조(어느 부분이 위·아래·왼쪽·오른쪽에 있는지)로 판단합니다.
+2. 답은 그 소전에 해당하는 해서(정자, 번체) 유니코드 글자로 씁니다. 《說文》 표제자 꼴을 우선합니다.
+3. 가장 가능성 높은 글자를 c에, 비슷해서 헷갈릴 만한 글자를 가능성 높은 순서로 alt에 넣습니다(최대 5개).
+4. HINTS
+5. 확신하면 sure를 true, 아니면 false. 소전으로 보이지 않으면 c를 "?"로 합니다.
+6. 답은 아래 JSON 하나만 출력합니다.
+
+{"direction":"horizontal","columns":[[{"c":"安","sure":true,"alt":["宴","宊"],"note":""}]]}`;
+
 // 손글씨 읽기 — 사이트의 '손글씨로 찾기' 칸에 쓴 글자 하나
 const HW_PROMPT = `이 그림은 사람이 손가락이나 펜으로 쓴 한자 한 글자입니다(흰 바탕에 검은 획).
 어떤 한자인지 읽어 주세요.
@@ -292,7 +306,9 @@ export default {
     }
     const image = String(body.image || "");
     const mediaType = ["image/jpeg", "image/png", "image/webp"].includes(body.mediaType) ? body.mediaType : "image/jpeg";
-    const mode = ["all", "seal", "hw"].includes(body.mode) ? body.mode : "big";
+    const mode = ["all", "seal", "hw", "sealhw"].includes(body.mode) ? body.mode : "big";
+    // 소전 그리기: 사이트가 모양 비교로 찾은 說文 소전 후보(참고용)
+    const hints = Array.isArray(body.hints) ? body.hints.map((c) => Array.from(String(c))[0] || "").filter((c) => /\p{Script=Han}/u.test(c)).slice(0, 12) : [];
     if (!image || image.length * 0.75 > MAX_IMAGE_BYTES) return reply({ error: "사진이 없거나 너무 큽니다" }, 400, h);
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -304,12 +320,15 @@ export default {
       },
       body: JSON.stringify({
         model: env.MODEL || DEFAULT_MODEL,
-        max_tokens: mode === "hw" ? 400 : 4000,
+        max_tokens: mode === "hw" || mode === "sealhw" ? 400 : 4000,
         messages: [{
           role: "user",
           content: [
             { type: "image", source: { type: "base64", media_type: mediaType, data: image } },
-            { type: "text", text: mode === "hw" ? HW_PROMPT : mode === "seal" ? SEAL_PROMPT : PROMPT.replace("MODE가", `MODE는 "${mode}"입니다. MODE가`) },
+            { type: "text", text: mode === "sealhw" ? SEALHW_PROMPT.replace("HINTS", hints.length
+              ? `참고: 사이트가 그림 모양을 《說文》 소전과 비교해 찾은 비슷한 글자들입니다(앞쪽일수록 비슷함): ${hints.join(" ")}. 이 가운데 맞는 것이 있으면 고르되, 없으면 무시하고 직접 읽습니다.`
+              : "참고 후보는 없습니다.")
+            : mode === "hw" ? HW_PROMPT : mode === "seal" ? SEAL_PROMPT : PROMPT.replace("MODE가", `MODE는 "${mode}"입니다. MODE가`) },
           ],
         }],
       }),
@@ -321,7 +340,7 @@ export default {
     const out = await res.json();
     const text = (out.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
     try {
-      const data = extractJson(text, mode === "hw" ? 5 : 3);
+      const data = extractJson(text, mode === "hw" || mode === "sealhw" ? 5 : 3);
       return reply({ ...data, mode, usage: out.usage || null }, 200, h);
     } catch (e) {
       return reply({ error: "읽은 결과를 해석하지 못했습니다", detail: text.slice(0, 300) }, 502, h);

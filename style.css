@@ -462,3 +462,11 @@ input[type="text"].bh-q { height: 48px; font-size: 1.1rem; margin-bottom: 10px; 
 .bh-dir th { white-space: nowrap; font-size: 1.05rem; }
 .bh-dir thead th { font-size: .8rem; color: var(--muted); }
 .bh-dir th .bh-note { font-size: .7rem; font-weight: normal; }
+
+/* 소전 그리기 AI 읽기 결과 */
+#sd-ai-list { width: 100%; margin: 2px 0 8px; }
+#sd-ai-status { width: 100%; margin-bottom: 4px; }
+#sd-ai-list .ai-best { outline: 2px solid var(--red); outline-offset: -2px; }
+#sd-ai-list .sd-both .rk::after { content: " ◎"; color: var(--gold); font-size: .7em; }
+#sd-ai:disabled { opacity: .55; }
+.hw-buttons > .btn.primary:last-child:nth-child(odd) { grid-column: 1 / -1; }   /* 모바일 2칸 격자에서 홀로 남은 AI 버튼은 한 줄 전체 */
