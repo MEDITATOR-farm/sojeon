@@ -220,9 +220,8 @@ const LEAF_PROMPT = `한자 「CHAR」의 소전 자형을 해석해 주세요.
 - 《說文解字》의 풀이와 통설·자전 풀이는 따르지 않습니다. 소리 요소도 뜻을 가진 기본자형으로 읽습니다.
 - 목록의 순서는 쓰는 순서가 아닙니다. 소전에서 놓인 자리를 보고 결설 순서(먼저 쓴 것이 결과, 뒤가 설명)를 정합니다.
 - "540부수"인 요소는 저자(최규화)의 분해표 그림이 함께 옵니다. 그림의 맨 왼쪽 큰 글자가 그 부수의 소전이고, 화살표 오른쪽 칸들이 저자가 나눈 소전 조각입니다(오른쪽 끝은 부수 번호와 해서).
-  칸은 왼쪽에서 오른쪽으로 단계적으로 나눈 과정이고, 줄이 바뀌면 다른 갈래이며, 회색 동그라미로 표시된 것은 더 나누지 않는 기본 획(고유부호)입니다.
-  갈래마다 왼쪽부터 보며 [기초자 80자]에 해당하는 조각이 나오면 그 단계에서 멈추고 그 기초자의 뜻을 씁니다(더 잘게 나누면 뜻이 엉뚱해집니다).
-  기초자에 닿지 않는 갈래만 끝의 고유부호로 읽습니다. 표에 없는 조각을 더하지 않습니다.
+  칸은 왼쪽에서 오른쪽으로 단계적으로 나눈 과정이고(첫 칸 = 첫 단계로 나눈 조각, 그 오른쪽 = 그 조각을 다시 나눈 것), 줄이 바뀌면 다른 갈래이며, 회색 동그라미로 표시된 것은 더 나누지 않는 기본 획(고유부호)입니다.
+  읽는 규칙: 갈래마다 첫 칸의 조각이 [기초자 80자]인지 보고, 맞으면 그 기초자의 뜻을 쓰고 거기서 멈춥니다. 아니면 한 칸 오른쪽(한 단계 더 나눈 조각)으로 가서 다시 확인합니다. 동그라미(고유부호)에 닿으면 그 부호의 뜻을 씁니다. 표에 없는 조각을 더하지 않습니다.
   조각이 기초자·고유부호 어느 것과도 맞지 않으면 note에 그 사실을 씁니다.
 KICHOBLOCK
 
@@ -233,14 +232,18 @@ ${BUHO}
 
 순서:
 1. kicho: 기본자형을 결설 순서로 놓고 각 요소에 고른 뜻을 붙입니다. 예: "宀(움집) + 女(출산·양육)".
-   540부수 요소는 분해표에서 읽어 낸 기초자로 바꿔 씁니다(예: 非 → 屮(가지·싹) + 巾(뿌리·늘어지다) + 一(땅)).
-1-1. found: 분해표 그림에서 읽어 낸 기초자 80자·고유부호를 [{"c":"屮","from":"非"}] 꼴로 모두 씁니다. from은 그 분해표의 부수 글자. 분해표가 없으면 [].
+   540부수 요소는 위 읽는 규칙으로 분해표에서 찾은 기초자·고유부호로 바꿔 씁니다(예: 牛 → 屮(가지·싹) + 一(땅)).
+1-1. grids: 분해표 그림마다 칸을 그대로 옮겨 적습니다. [{"from":"牛","cells":[{"r":0,"c":0,"ch":"屮","circle":false},{"r":0,"c":1,"ch":"丨","circle":true},{"r":0,"c":2,"ch":"凵","circle":true},{"r":1,"c":0,"ch":"一","circle":true}]}]
+   - r: 줄(위에서 0부터), c: 칸(화살표 바로 오른쪽 첫 칸이 0). 빈칸은 쓰지 않습니다. 맨 왼쪽 큰 글자와 오른쪽 끝의 번호·해서 칸은 쓰지 않습니다.
+   - ch: 그 칸의 소전 조각에 해당하는 유니코드 한 글자. [기초자 80자]의 글자와 같은 꼴이면 반드시 그 글자로 씁니다. 동그라미 속 기본 획은 一 丨 丿 乀 囗 凵 冖 コ 匚 중 하나로. 알 수 없으면 "?".
+   - circle: 회색 동그라미 안에 있으면 true.
+   분해표가 없으면 [].
 2. jx: 그 뜻들과 방향·위치·유형(동작·방향·복수·마주보기·품기·맴돌기·생략)으로 글자가 보여 주는 장면을 풀이하고, 그 장면에서 글자의 뜻이 나오는 과정을 한국어 3~5문장으로 씁니다.
 3. hun: 해석에서 나온 뜻을 담은 훈과 음(예: "편안할 안").
 4. 기초자 뜻이 없는 요소("기초자 아님")는 그 글자의 일반적인 훈으로만 짧게 다루고, 해석이 억지스러우면 note에 솔직히 쓰고 sure를 false로 합니다.
 
 답은 아래 JSON 하나만 출력합니다.
-{"parts":[],"found":[],"kicho":"","jx":"","sori":"","hun":"","sure":true,"note":""}`;
+{"parts":[],"grids":[],"kicho":"","jx":"","sori":"","hun":"","sure":true,"note":""}`;
 
 function leafText(leaves) {
   return leaves.slice(0, 12).map((l) => {
@@ -265,10 +268,15 @@ export function extractJahae(text) {
     role: ROLES.includes(p.role) ? p.role : "",
     mean: str(p.mean, 40),
   })).filter((p) => /\p{Script=Han}/u.test(p.c));
-  const found = (Array.isArray(d.found) ? d.found : []).slice(0, 12).map((f) => ({
-    c: Array.from(String((f && f.c) || ""))[0] || "", from: Array.from(String((f && f.from) || ""))[0] || "",
-  })).filter((f) => f.c && f.c.codePointAt(0) > 0x2e7f);
-  return { parts, found, kicho: str(d.kicho, 300), jx: str(d.jx, 1200), sori: str(d.sori, 300), hun: str(d.hun, 40), sure: d.sure !== false, note: str(d.note, 300) };
+  const one = (v) => Array.from(String(v || ""))[0] || "";
+  const grids = (Array.isArray(d.grids) ? d.grids : []).slice(0, 4).map((g) => ({
+    from: one(g && g.from),
+    cells: (Array.isArray(g && g.cells) ? g.cells : []).slice(0, 80).map((x) => ({
+      r: Math.max(0, Math.min(20, parseInt(x && x.r, 10) || 0)), c: Math.max(0, Math.min(20, parseInt(x && x.c, 10) || 0)),
+      ch: one(x && x.ch) || "?", circle: !!(x && x.circle),
+    })),
+  })).filter((g) => g.from && g.cells.length);
+  return { parts, grids, kicho: str(d.kicho, 300), jx: str(d.jx, 1200), sori: str(d.sori, 300), hun: str(d.hun, 40), sure: d.sure !== false, note: str(d.note, 300) };
 }
 
 function cors(origin, allowed) {

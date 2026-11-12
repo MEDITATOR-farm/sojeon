@@ -166,18 +166,42 @@
   function loadHun(ch) { try { return localStorage.getItem(hunKey(ch)) || ""; } catch (e) { return ""; } }
   function saveHun(ch, v) { try { v ? localStorage.setItem(hunKey(ch), v) : localStorage.removeItem(hunKey(ch)); } catch (e) {} }
 
+  // 저자 분해표 읽는 규칙: 갈래마다 첫 칸이 기초자 80자면 거기서 멈추고, 아니면 한 칸 오른쪽(한 단계 더 나눈 조각)으로.
+  // 고유부호(동그라미)에 닿으면 그것으로. 칸 (r,c)의 윗 단계는 c-1 칸 가운데 r보다 위·같은 줄에서 가장 가까운 것.
+  function chartLeaves(cells) {
+    const cs = cells.slice().sort((a, b) => a.r - b.r || a.c - b.c);
+    const kids = new Map(cs.map((x) => [x, []]));
+    const roots = [];
+    cs.forEach((x) => {
+      if (x.c === 0) { roots.push(x); return; }
+      const up = cs.filter((y) => y.c === x.c - 1 && y.r <= x.r).sort((a, b) => b.r - a.r)[0];
+      if (up) kids.get(up).push(x); else roots.push(x);
+    });
+    const out = [];
+    const walk = (x, path) => {
+      const p = path ? path + "›" + x.ch : x.ch;
+      const k = kIndex(x.ch);
+      if (k !== undefined) { out.push({ ch: x.ch, k, path: p }); return; }
+      if (x.circle || buho(x.ch) || !kids.get(x).length) { out.push({ ch: x.ch, k: undefined, circle: x.circle, path: p }); return; }
+      kids.get(x).forEach((y) => walk(y, p));
+    };
+    roots.forEach((x) => walk(x, ""));
+    return out;
+  }
+
   function decodeBlock(ch, root) {
     const box = document.createElement("div");
     box.className = "bh-decode";
-    // AI가 저자 분해표에서 읽어 낸 기초자가 있으면, 그 540부수 자리를 기초자로 바꿔 넣음
+    // AI가 옮겨 적은 저자 분해표 칸에 읽는 규칙을 적용해, 그 540부수 자리를 기초자·고유부호로 바꿔 넣음
     const ai = jxCached(ch);
-    const fromChart = (ai && Array.isArray(ai.found)) ? ai.found : [];
+    const grids = (ai && Array.isArray(ai.grids)) ? ai.grids : [];
     const leaves = basicLeaves(root, "", 0, new Set(), "").flatMap((l) => {
       if (l.r === undefined) return [l];
-      const got = fromChart.filter((f) => f.from === l.ch || (!f.from && fromChart.every((g) => !g.from)));
+      const g = grids.find((x) => x.from === l.ch) || (grids.length === 1 ? grids[0] : null);
+      const got = g ? chartLeaves(g.cells) : [];
       if (!got.length) return [l];
-      return got.map((f) => ({ ch: f.c, role: "", k: kIndex(f.c), b: kIndex(f.c) === undefined ? buho(f.c) : undefined,
-        via: `${l.ch} 분해표(AI 판독)` }));
+      return got.map((f) => ({ ch: f.ch, role: "", k: kIndex(f.ch), b: f.k === undefined ? (buho(f.ch) || (f.circle ? { hun: "고유부호", seal: "", mean: [], key: "" } : undefined)) : undefined,
+        via: `${l.ch} 분해표 ${f.path}(AI 판독)` }));
     });
     const found = leaves.filter((l) => l.k !== undefined || l.b || l.r !== undefined);
 
@@ -281,7 +305,7 @@
   // AI(사진 읽기와 같은 서버, mode "jahae")가 자원(字源)에 따른 구성요소를 주면, 그 구성을 임시 說文 항목으로 넣어
   // 아래의 자형 분해(說文 트리)·소전 해독(기초자)을 그대로 이어서 씀. 결과는 이 기기에 저장해 다음부터는 무료.
   const JKEY = "sojeon-jahae2-";   // 2: 기초자 80자 기준 해석(說文 따르지 않음). 예전 說文 기준 결과(sojeon-jahae-)는 쓰지 않음
-  const XKEY = "sojeon-jx3-";      // 3: 자형 분해도의 기본자형(기초자 80자 뜻)으로 해석
+  const XKEY = "sojeon-jx4-";      // 4: 분해표 칸 옮겨 적기(grids) + 사이트가 읽는 규칙 적용      // 3: 자형 분해도의 기본자형(기초자 80자 뜻)으로 해석
   // 자형 분해도에서 찾은 기본자형과 그 뜻 — AI에게 보내 이것만으로 해석하게 함
   // 저자 분해표 한 칸을 그림(JPEG base64)으로 잘라 AI에게 보냄
   const sheetCache = {};
@@ -356,6 +380,21 @@
     const f = d.parts.map((p) => `${esc(p.c)}(${esc(p.mean || "")}${isSound(p.role) ? "·소리" : ""})`).join(" + ");
     if (d.parts && d.parts.length) box.insertAdjacentHTML("beforeend", `<p class="bh-say bh-formula">${esc(ch)} = ${f}</p>`);
     if (d.kicho) box.insertAdjacentHTML("beforeend", `<div class="bh-h4">기초자로 나누기</div><p class="bh-say bh-formula">${esc(d.kicho)}</p>`);
+    (d.grids || []).forEach((g) => {
+      // AI가 옮겨 적은 분해표 칸 — 저자 분해표와 맞는지 눈으로 확인할 수 있게
+      const nr = Math.max(...g.cells.map((x) => x.r)) + 1, nc = Math.max(...g.cells.map((x) => x.c)) + 1;
+      let t = `<div class="bh-h4">${esc(g.from)} 분해표를 AI가 옮겨 적은 것 <span class="rs-sub">(동그라미 = ◯, 기초자 = 굵게)</span></div><table class="bh-dir bh-grid"><tbody>`;
+      for (let r = 0; r < nr; r++) {
+        t += "<tr>";
+        for (let c = 0; c < nc; c++) {
+          const x = g.cells.find((y) => y.r === r && y.c === c);
+          t += `<td>${x ? (kIndex(x.ch) !== undefined ? `<b>${esc(x.ch)}</b>` : esc(x.ch)) + (x.circle ? "◯" : "") : ""}</td>`;
+        }
+        t += "</tr>";
+      }
+      t += `</tbody></table><p class="bh-say bh-note">읽는 규칙(첫 칸부터 기초자를 찾고, 없으면 한 단계 오른쪽으로) 적용 결과: ${chartLeaves(g.cells).map((x) => esc(x.path)).join(" · ")}</p>`;
+      box.insertAdjacentHTML("beforeend", t);
+    });
     if (d.jx) box.insertAdjacentHTML("beforeend", `<div class="bh-h4">자형 해석 — 기초자·고유부호·결설 구조</div><p class="bh-say">${esc(d.jx)}</p>`);
     if (d.sori) box.insertAdjacentHTML("beforeend", `<div class="bh-h4">소리</div><p class="bh-say">${esc(d.sori)}</p>`);
     if (d.hun) box.insertAdjacentHTML("beforeend", `<p class="bh-say">훈: <b>${esc(d.hun)}</b></p>`);
