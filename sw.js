@@ -1,6 +1,6 @@
 // 소전 앱 오프라인 저장소 (서비스 워커)
 // 파일을 고쳐 올릴 때마다 아래 버전 숫자를 하나씩 올려 주세요. → 휴대폰에 설치된 앱도 새 파일로 바뀝니다.
-const VERSION = "sojeon-v28";
+const VERSION = "sojeon-v29";
 
 // 앱을 처음 열 때 미리 저장해 두는 기본 파일
 const CORE = [
@@ -65,12 +65,13 @@ self.addEventListener("fetch", (e) => {
   // 내 사이트의 기본 파일: 인터넷이 되면 최신 파일, 안 되면 저장해 둔 파일
   if (url.origin === self.location.origin) {
     e.respondWith(
-      fetch(req)
+      // cache: "no-cache" — 브라우저 캐시(GitHub Pages는 10분)에 남은 옛 파일 대신 서버에 최신인지 확인하고 받음
+      fetch(req, { cache: "no-cache" })
         .then((res) => {
           if (res.ok) caches.open(VERSION).then((c) => c.put(req, res.clone()));
           return res;
         })
-        .catch(() => caches.match(req).then((hit) => hit || caches.match("index.html")))
+        .catch(() => caches.match(req, { ignoreSearch: true }).then((hit) => hit || caches.match("index.html")))
     );
   }
 });
