@@ -137,7 +137,7 @@ const SPLIT_PROMPT = `한자 「CHAR」의 소전을 자형 분해해 주세요.
 - 글자 자체가 기초자 80자나 540부수이면 parts를 비웁니다.
 - c는 유니코드 한 글자. 소전에서 그 조각에 해당하는 글자(가능하면 기초자 80자·540부수의 글자)로 씁니다.
 
-답은 아래 JSON 하나만 출력합니다.
+답은 answer 서식에 채워 제출합니다. 예:
 {"tree":{"c":"害","parts":[{"c":"宀","parts":[]},{"c":"丯","parts":[{"c":"屮","parts":[]}]},{"c":"口","parts":[]}]},"sure":true,"note":""}`;
 
 function cleanTree(n, depth) {
@@ -172,7 +172,7 @@ const JAHAE_PROMPT = `한자 「CHAR」의 소전 자형을 해석해 주세요.
 5. hun: 해석에서 나온 뜻을 담아 훈과 음을 씁니다(예: "근원 원").
 6. 기초자로 깔끔하게 나눠지지 않는 부분이 있으면 note에 솔직히 쓰고 sure를 false로 합니다.
 
-답은 아래 JSON 하나만 출력합니다.
+답은 answer 서식에 채워 제출합니다. 예:
 {"parts":[{"c":"厂","role":"","mean":"언덕"},{"c":"泉","role":"","mean":"샘"}],"kicho":"","jx":"","sori":"","hun":"","sure":true,"note":""}`;
 
 // 자형 분해도의 기본자형으로 해석 — 사이트가 자형 분해도에서 찾은 기본자형과 그 기초자 80자 뜻을 보내면,
@@ -204,7 +204,7 @@ LEAVES
 3. hun: 해석에서 나온 뜻을 담은 훈과 음(예: "편안할 안").
 4. 기초자 뜻이 없는 요소("기초자 아님")는 그 글자의 일반적인 훈으로만 짧게 다루고, 해석이 억지스러우면 note에 솔직히 쓰고 sure를 false로 합니다.
 
-답은 아래 JSON 하나만 출력합니다.
+답은 answer 서식에 채워 제출합니다. 예:
 {"parts":[],"grids":[],"kicho":"","jx":"","sori":"","hun":"","sure":true,"note":""}`;
 
 function leafText(leaves) {
@@ -221,9 +221,12 @@ function leafText(leaves) {
 
 const ROLES = ["", "聲", "亦聲", "省", "省聲"];
 export function extractJahae(text) {
-  const m = text.match(/\{[\s\S]*\}/);
-  if (!m) throw new Error("no json");
-  const d = JSON.parse(m[0]);
+  let d = text;
+  if (typeof text === "string") {
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error("no json");
+    d = JSON.parse(m[0]);
+  }
   const str = (v, n) => String(v || "").slice(0, n);
   const parts = (Array.isArray(d.parts) ? d.parts : []).slice(0, 6).map((p) => ({
     c: Array.from(String(p.c || ""))[0] || "",
@@ -239,6 +242,42 @@ export function extractJahae(text) {
     })),
   })).filter((g) => g.from && g.cells.length);
   return { parts, grids, kicho: str(d.kicho, 300), jx: str(d.jx, 1200), sori: str(d.sori, 300), hun: str(d.hun, 40), sure: d.sure !== false, note: str(d.note, 300) };
+}
+
+// AI에게 답을 자유 문장이 아니라 정해진 서식(도구 입력)으로 채우게 함 → 따옴표 등으로 JSON이 깨지는 일이 없음
+const ANSWER_TOOL = {
+  name: "answer",
+  description: "요청한 자형 분해·해석 결과를 이 서식에 채워 제출한다.",
+  input_schema: {
+    type: "object",
+    properties: {
+      parts: { type: "array", items: { type: "object", properties: { c: { type: "string" }, role: { type: "string" }, mean: { type: "string" } } } },
+      grids: { type: "array", items: { type: "object", properties: {
+        from: { type: "string" },
+        cells: { type: "array", items: { type: "object", properties: { r: { type: "integer" }, c: { type: "integer" }, ch: { type: "string" }, circle: { type: "boolean" } } } },
+      } } },
+      tree: { type: "object", description: '{"c":"글자","parts":[{"c":"조각","parts":[...]}]} 꼴의 분해 트리' },
+      kicho: { type: "string" }, jx: { type: "string" }, sori: { type: "string" }, hun: { type: "string" },
+      sure: { type: "boolean" }, note: { type: "string" },
+    },
+  },
+};
+async function askTool(env, content, maxTokens) {
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({
+      model: env.MODEL || DEFAULT_MODEL, max_tokens: maxTokens,
+      tools: [ANSWER_TOOL], tool_choice: { type: "tool", name: "answer" },
+      messages: [{ role: "user", content }],
+    }),
+  });
+  if (!r.ok) return { error: { error: "Claude API 오류", status: r.status, detail: (await r.text()).slice(0, 300) } };
+  const o = await r.json();
+  const use = (o.content || []).find((b) => b.type === "tool_use");
+  if (o.stop_reason === "max_tokens") return { error: { error: "AI 답이 너무 길어 중간에 끊겼습니다. 다시 눌러 주세요." } };
+  if (!use || !use.input) return { error: { error: "AI가 서식에 맞는 답을 내지 않았습니다. 다시 눌러 주세요." } };
+  return { input: use.input, usage: o.usage || null };
 }
 
 function cors(origin, allowed) {
@@ -309,20 +348,12 @@ export default {
       if (img) content.push({ type: "image", source: { type: "base64", media_type: "image/png", data: img } });
       content.push({ type: "text", text: SPLIT_PROMPT.replace("CHAR", ch)
         .replace("IMGNOTE", img ? " 그림은 이 글자의 소전입니다." : " (소전 그림 없음 — 알고 있는 소전 모양으로 나눕니다.)") });
-      const r = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-        body: JSON.stringify({ model: env.MODEL || DEFAULT_MODEL, max_tokens: 1500, messages: [{ role: "user", content }] }),
-      });
-      if (!r.ok) return reply({ error: "Claude API 오류", status: r.status, detail: (await r.text()).slice(0, 300) }, 502, h);
-      const o = await r.json();
-      const t = (o.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
-      try {
-        const d = JSON.parse(t.match(/\{[\s\S]*\}/)[0]);
-        const tree = cleanTree(d.tree, 0) || { c: ch, parts: [] };
-        tree.c = ch;
-        return reply({ tree, sure: d.sure !== false, note: String(d.note || "").slice(0, 300), mode: "split", usage: o.usage || null }, 200, h);
-      } catch (e) { return reply({ error: "분해 결과를 해석하지 못했습니다", detail: t.slice(0, 300) }, 502, h); }
+      const a = await askTool(env, content, 3000);
+      if (a.error) return reply(a.error, 502, h);
+      const d = a.input;
+      const tree = cleanTree(typeof d.tree === "string" ? JSON.parse(d.tree) : d.tree, 0) || { c: ch, parts: [] };
+      tree.c = ch;
+      return reply({ tree, sure: d.sure !== false, note: String(d.note || "").slice(0, 300), mode: "split", usage: a.usage }, 200, h);
     }
 
     // 자해 모드: 그림 없이 글자 하나만
@@ -343,20 +374,10 @@ export default {
       });
       content.push({ type: "text", text: prompt });
       if (!/\p{Script=Han}/u.test(ch)) return reply({ error: "한자 한 글자를 보내 주세요" }, 400, h);
-      const r = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-        body: JSON.stringify({
-          model: env.MODEL || DEFAULT_MODEL,
-          max_tokens: 2500,
-          messages: [{ role: "user", content }],
-        }),
-      });
-      if (!r.ok) return reply({ error: "Claude API 오류", status: r.status, detail: (await r.text()).slice(0, 300) }, 502, h);
-      const o = await r.json();
-      const t = (o.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
-      try { return reply({ ...extractJahae(t), char: ch, mode: "jahae", usage: o.usage || null }, 200, h); }
-      catch (e) { return reply({ error: "풀이 결과를 해석하지 못했습니다", detail: t.slice(0, 300) }, 502, h); }
+      const a = await askTool(env, content, 6000);
+      if (a.error) return reply(a.error, 502, h);
+      try { return reply({ ...extractJahae(a.input), char: ch, mode: "jahae", usage: a.usage }, 200, h); }
+      catch (e) { return reply({ error: "풀이 결과를 해석하지 못했습니다", detail: String(e).slice(0, 200) }, 502, h); }
     }
     const image = String(body.image || "");
     const mediaType = ["image/jpeg", "image/png", "image/webp"].includes(body.mediaType) ? body.mediaType : "image/jpeg";
