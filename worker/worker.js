@@ -219,6 +219,12 @@ const LEAF_PROMPT = `한자 「CHAR」의 소전 자형을 해석해 주세요.
 - 각 기본자형의 뜻은 함께 적힌 기초자 80자의 뜻(뜻 낱말·풀이)에서만 고릅니다. 목록에 없는 뜻을 지어내지 않습니다.
 - 《說文解字》의 풀이와 통설·자전 풀이는 따르지 않습니다. 소리 요소도 뜻을 가진 기본자형으로 읽습니다.
 - 목록의 순서는 쓰는 순서가 아닙니다. 소전에서 놓인 자리를 보고 결설 순서(먼저 쓴 것이 결과, 뒤가 설명)를 정합니다.
+- "540부수"인 요소는 저자(최규화)의 분해표 그림이 함께 옵니다. 그림의 맨 왼쪽 큰 글자가 그 부수의 소전이고, 화살표 오른쪽 칸들이 저자가 나눈 소전 조각입니다(오른쪽 끝은 부수 번호와 해서).
+  칸은 왼쪽에서 오른쪽으로 단계적으로 나눈 과정이고, 줄이 바뀌면 다른 갈래이며, 회색 동그라미로 표시된 것은 더 나누지 않는 기본 획(고유부호)입니다.
+  갈래마다 왼쪽부터 보며 [기초자 80자]에 해당하는 조각이 나오면 그 단계에서 멈추고 그 기초자의 뜻을 씁니다(더 잘게 나누면 뜻이 엉뚱해집니다).
+  기초자에 닿지 않는 갈래만 끝의 고유부호로 읽습니다. 표에 없는 조각을 더하지 않습니다.
+  조각이 기초자·고유부호 어느 것과도 맞지 않으면 note에 그 사실을 씁니다.
+KICHOBLOCK
 
 [자형 분해도의 기본자형]
 LEAVES
@@ -241,6 +247,7 @@ function leafText(leaves) {
     if (!c) return "";
     if (l.kind === "기초자") return `${c} (기초자, ${t(l.hun, 20)}): ${t(l.mean, 160)}${l.say ? " | " + t(l.say, 200) : ""}`;
     if (l.kind === "부호") return `${c} (고유부호, ${t(l.hun, 20)}): ${t(l.mean, 160)}`;
+    if (l.kind === "분해표") return `${c} (540부수, 훈음 ${t(l.hun, 30)}) — 저자의 분해표 그림${l.image ? "을 함께 보냄" : "은 없음"}. 표에 나눈 조각을 기초자 80자·고유부호로 읽어 뜻을 정할 것`;
     return `${c} (기초자 아님, 훈음 ${t(l.hun, 30)})`;
   }).filter(Boolean).join("\n");
 }
@@ -323,7 +330,19 @@ export default {
       const ch = Array.from(String(body.char || ""))[0] || "";
       // 자형 분해도의 기본자형이 오면 그것만으로 해석, 없으면(분해도가 없는 글자) AI가 기초자로 나눔
       const leaves = Array.isArray(body.leaves) ? leafText(body.leaves) : "";
-      const prompt = leaves ? LEAF_PROMPT.replace("CHAR", ch).replace("LEAVES", leaves) : JAHAE_PROMPT.replace("CHAR", ch);
+      // 540부수 분해표 그림 (최대 4장, 한 장 1.5MB 이하)
+      const charts = (Array.isArray(body.leaves) ? body.leaves : [])
+        .filter((l) => l && l.kind === "분해표" && typeof l.image === "string" && l.image.length < 2000000).slice(0, 4);
+      const prompt = leaves
+        ? LEAF_PROMPT.replace("CHAR", ch).replace("LEAVES", leaves)
+            .replace("KICHOBLOCK", charts.length ? "\n[기초자 80자 — 분해표 조각을 읽을 때 씀]\n" + KICHO : "")
+        : JAHAE_PROMPT.replace("CHAR", ch);
+      const content = [];
+      charts.forEach((l) => {
+        content.push({ type: "text", text: `${Array.from(String(l.c))[0]} — 저자 분해표 그림:` });
+        content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: l.image } });
+      });
+      content.push({ type: "text", text: prompt });
       if (!/\p{Script=Han}/u.test(ch)) return reply({ error: "한자 한 글자를 보내 주세요" }, 400, h);
       const r = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -331,7 +350,7 @@ export default {
         body: JSON.stringify({
           model: env.MODEL || DEFAULT_MODEL,
           max_tokens: 2500,
-          messages: [{ role: "user", content: prompt }],
+          messages: [{ role: "user", content }],
         }),
       });
       if (!r.ok) return reply({ error: "Claude API 오류", status: r.status, detail: (await r.text()).slice(0, 300) }, 502, h);
