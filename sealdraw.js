@@ -242,7 +242,7 @@
       if (seq !== aiSeq) return;
       if (!res.ok) {
         if (data.code === "bad_code") { phSetCode(""); codeRow.hidden = false; }
-        aiStatus.textContent = "읽지 못했습니다: " + (data.error || res.status);
+        aiStatus.textContent = "읽지 못했습니다: " + (data.error || res.status) + (data.status ? ` (${data.status}) ` + String(data.detail || "").slice(0, 160) : "");
         return;
       }
     } catch (e) {

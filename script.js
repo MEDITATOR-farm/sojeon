@@ -383,7 +383,7 @@ async function phRead(file) {
     data = await res.json();
     if (!res.ok) {
       if (data.code === "bad_code") { phSetCode(""); phPendingFile = file; phCodeRow.hidden = false; }
-      phStatus.textContent = "읽지 못했습니다: " + (data.error || res.status);
+      phStatus.textContent = "읽지 못했습니다: " + (data.error || res.status) + (data.status ? ` (${data.status}) ` + String(data.detail || "").slice(0, 160) : "");
       return;
     }
   } catch (e) {
@@ -852,7 +852,7 @@ async function hwAiRead() {
     if (seq !== hwAiSeq) return;
     if (!res.ok) {
       if (data.code === "bad_code") { phSetCode(""); hwCodeRow.hidden = false; }
-      hwAiStatus.textContent = "읽지 못했습니다: " + (data.error || res.status);
+      hwAiStatus.textContent = "읽지 못했습니다: " + (data.error || res.status) + (data.status ? ` (${data.status}) ` + String(data.detail || "").slice(0, 160) : "");
       return;
     }
   } catch (e) {

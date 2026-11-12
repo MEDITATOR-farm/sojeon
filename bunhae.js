@@ -301,6 +301,21 @@
     return d;
   }
 
+  // 서버 오류를 사람이 읽을 수 있게 — Claude API가 거절한 이유(상태 번호·설명)도 함께 보여 줌
+  function apiErr(d, status) {
+    let why = d.error || status;
+    if (d.status) {
+      const t = String(d.detail || "");
+      const m = t.match(/"message"\s*:\s*"([^"]+)"/);
+      const hint = d.status === 401 ? " → API 키가 틀렸거나 없습니다(워커의 ANTHROPIC_API_KEY 확인)"
+        : /credit balance/i.test(t) ? " → Anthropic 계정의 크레딧(잔액)이 부족합니다. console.anthropic.com에서 충전해 주세요"
+        : d.status === 429 ? " → 짧은 시간에 요청이 많았습니다. 1분쯤 뒤에 다시 눌러 주세요"
+        : d.status === 529 || d.status === 503 ? " → Claude 서버가 붐빕니다. 잠시 뒤에 다시 눌러 주세요"
+        : d.status === 400 ? " → 요청 형식 문제입니다. 아래 설명을 알려 주세요" : "";
+      why += ` (${d.status})${hint}${m ? " — " + m[1] : t ? " — " + t.slice(0, 160) : ""}`;
+    }
+    return why;
+  }
   // ===== AI 자해: 《說文》 표제자로 바로 찾을 수 없는 글자 =====
   // AI(사진 읽기와 같은 서버, mode "jahae")가 자원(字源)에 따른 구성요소를 주면, 그 구성을 임시 說文 항목으로 넣어
   // 아래의 자형 분해(說文 트리)·소전 해독(기초자)을 그대로 이어서 씀. 결과는 이 기기에 저장해 다음부터는 무료.
@@ -364,7 +379,7 @@
         body: JSON.stringify(leaves ? { mode: "jahae", char: ch, leaves: await withCharts(leaves) } : { mode: "jahae", char: ch }),
       });
       const d = await res.json();
-      if (!res.ok) { msg.textContent = "풀이하지 못했습니다: " + (d.error || res.status); return; }
+      if (!res.ok) { msg.textContent = "풀이하지 못했습니다: " + apiErr(d, res.status); return; }
       if (d.mode !== "jahae") { msg.textContent = "서버(Cloudflare 워커)가 아직 자해 기능이 없는 옛 버전입니다. 새 worker.js로 갱신해 주세요."; return; }
       if (!known && (!d.parts || !d.parts.length)) { msg.textContent = "AI가 구성요소를 내놓지 못했습니다." + (d.note ? " " + d.note : ""); return; }
       try { localStorage.setItem((known ? XKEY : JKEY) + ch, JSON.stringify(d)); } catch (e) { /* 저장 안 됨 */ }
@@ -449,7 +464,7 @@
         body: JSON.stringify({ mode: "split", char: ch, image }),
       });
       const d = await res.json();
-      if (!res.ok) { msg.textContent = "나누지 못했습니다: " + (d.error || res.status); return; }
+      if (!res.ok) { msg.textContent = "나누지 못했습니다: " + apiErr(d, res.status); return; }
       if (d.mode !== "split") { msg.textContent = "서버(Cloudflare 워커)가 아직 자형 분해 기능이 없는 옛 버전입니다. 새 worker.js로 갱신해 주세요."; return; }
       try { localStorage.setItem(SKEY + ch, JSON.stringify(d)); } catch (e) { /* 저장 안 됨 */ }
       try { localStorage.removeItem(XKEY + ch); } catch (e) { /* 분해가 바뀌면 예전 해석은 지움 */ }
