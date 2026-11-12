@@ -233,12 +233,14 @@ ${BUHO}
 
 순서:
 1. kicho: 기본자형을 결설 순서로 놓고 각 요소에 고른 뜻을 붙입니다. 예: "宀(움집) + 女(출산·양육)".
+   540부수 요소는 분해표에서 읽어 낸 기초자로 바꿔 씁니다(예: 非 → 屮(가지·싹) + 巾(뿌리·늘어지다) + 一(땅)).
+1-1. found: 분해표 그림에서 읽어 낸 기초자 80자·고유부호를 [{"c":"屮","from":"非"}] 꼴로 모두 씁니다. from은 그 분해표의 부수 글자. 분해표가 없으면 [].
 2. jx: 그 뜻들과 방향·위치·유형(동작·방향·복수·마주보기·품기·맴돌기·생략)으로 글자가 보여 주는 장면을 풀이하고, 그 장면에서 글자의 뜻이 나오는 과정을 한국어 3~5문장으로 씁니다.
 3. hun: 해석에서 나온 뜻을 담은 훈과 음(예: "편안할 안").
 4. 기초자 뜻이 없는 요소("기초자 아님")는 그 글자의 일반적인 훈으로만 짧게 다루고, 해석이 억지스러우면 note에 솔직히 쓰고 sure를 false로 합니다.
 
 답은 아래 JSON 하나만 출력합니다.
-{"parts":[],"kicho":"","jx":"","sori":"","hun":"","sure":true,"note":""}`;
+{"parts":[],"found":[],"kicho":"","jx":"","sori":"","hun":"","sure":true,"note":""}`;
 
 function leafText(leaves) {
   return leaves.slice(0, 12).map((l) => {
@@ -263,7 +265,10 @@ export function extractJahae(text) {
     role: ROLES.includes(p.role) ? p.role : "",
     mean: str(p.mean, 40),
   })).filter((p) => /\p{Script=Han}/u.test(p.c));
-  return { parts, kicho: str(d.kicho, 300), jx: str(d.jx, 1200), sori: str(d.sori, 300), hun: str(d.hun, 40), sure: d.sure !== false, note: str(d.note, 300) };
+  const found = (Array.isArray(d.found) ? d.found : []).slice(0, 12).map((f) => ({
+    c: Array.from(String((f && f.c) || ""))[0] || "", from: Array.from(String((f && f.from) || ""))[0] || "",
+  })).filter((f) => f.c && f.c.codePointAt(0) > 0x2e7f);
+  return { parts, found, kicho: str(d.kicho, 300), jx: str(d.jx, 1200), sori: str(d.sori, 300), hun: str(d.hun, 40), sure: d.sure !== false, note: str(d.note, 300) };
 }
 
 function cors(origin, allowed) {

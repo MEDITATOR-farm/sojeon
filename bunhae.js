@@ -169,7 +169,16 @@
   function decodeBlock(ch, root) {
     const box = document.createElement("div");
     box.className = "bh-decode";
-    const leaves = basicLeaves(root, "", 0, new Set(), "");
+    // AI가 저자 분해표에서 읽어 낸 기초자가 있으면, 그 540부수 자리를 기초자로 바꿔 넣음
+    const ai = jxCached(ch);
+    const fromChart = (ai && Array.isArray(ai.found)) ? ai.found : [];
+    const leaves = basicLeaves(root, "", 0, new Set(), "").flatMap((l) => {
+      if (l.r === undefined) return [l];
+      const got = fromChart.filter((f) => f.from === l.ch || (!f.from && fromChart.every((g) => !g.from)));
+      if (!got.length) return [l];
+      return got.map((f) => ({ ch: f.c, role: "", k: kIndex(f.c), b: kIndex(f.c) === undefined ? buho(f.c) : undefined,
+        via: `${l.ch} 분해표(AI 판독)` }));
+    });
     const found = leaves.filter((l) => l.k !== undefined || l.b || l.r !== undefined);
 
     // ① 찾은 기본자형과 그 뜻
