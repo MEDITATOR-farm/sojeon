@@ -470,3 +470,17 @@ input[type="text"].bh-q { height: 48px; font-size: 1.1rem; margin-bottom: 10px; 
 #sd-ai-list .sd-both .rk::after { content: " ◎"; color: var(--gold); font-size: .7em; }
 #sd-ai:disabled { opacity: .55; }
 .hw-buttons > .btn.primary:last-child:nth-child(odd) { grid-column: 1 / -1; }   /* 모바일 2칸 격자에서 홀로 남은 AI 버튼은 한 줄 전체 */
+
+/* 소전 100 */
+.s100-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; margin-top: 10px; }
+.s100-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px 6px; background: rgba(255,255,255,.04);
+  border: 1px solid var(--line); border-radius: 10px; color: var(--ink); cursor: pointer; font: inherit; }
+.s100-cell:hover { border-color: var(--gold); }
+.s100-seal { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; }
+.s100-seal .sw-glyph { --sz: 60px; }
+.s100-seal .glyph { width: 60px; height: 60px; }
+.s100-ks { font-size: .85rem; color: var(--muted); }
+.s100-ks b { font-weight: normal; color: var(--ink); }
+.s100-ks small { margin-left: 3px; font-size: .75rem; }
+.s100-meta { font-size: .68rem; color: var(--muted); }
+.s100-src { margin-top: 6px; font-size: .75rem; }

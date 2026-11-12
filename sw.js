@@ -1,6 +1,6 @@
 // 소전 앱 오프라인 저장소 (서비스 워커)
 // 파일을 고쳐 올릴 때마다 아래 버전 숫자를 하나씩 올려 주세요. → 휴대폰에 설치된 앱도 새 파일로 바뀝니다.
-const VERSION = "sojeon-v29";
+const VERSION = "sojeon-v30";
 
 // 앱을 처음 열 때 미리 저장해 두는 기본 파일
 const CORE = [
@@ -16,6 +16,7 @@ const CORE = [
   "bunhae/data.js",
   "bunhae/buho.js",
   "bunhae/k80det.js",
+  "bunhae/s100.js",
   "hanja.txt",
   "manifest.webmanifest",
   "icons/icon-192.png",

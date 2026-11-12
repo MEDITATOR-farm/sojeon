@@ -16,7 +16,7 @@
   <meta name="description" content="해서체 한자를 입력하면 유니코드 소전(小篆) 글자로 바꿔주는 변환기">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=29">
+  <link rel="stylesheet" href="style.css?v=30">
 </head>
 <body>
   <main class="wrap">
@@ -153,6 +153,18 @@
     </section>
 
     <section class="card">
+      <details id="s100" class="rs-box">
+        <summary class="label">소전 100 <span class="rs-sub">자주 쓰는 부수 — 소전이 먼저, 해서는 그 아래</span></summary>
+        <p class="hint">한국 교육용 기초한자 1,800자를 부수로 세어, 글자를 가장 많이 거느린 부수 100개를 골랐습니다. 소전을 누르면 글자 풀이가 나옵니다.</p>
+        <div id="s100-grid" class="s100-grid"></div>
+        <div class="buttons">
+          <button type="button" id="s100-send" class="btn">100자를 소전 결과로 보내기</button>
+        </div>
+        <p class="hint s100-src">통계: Unihan 18의 한국 교육용 기초한자(kKoreanEducationHanja)와 강희 부수(kRSUnicode). 같은 글자 수는 Unihan Core 2020 글자 수로 순위를 가림. 소전: 《說文解字》 표제자(崇羲篆體).</p>
+      </details>
+    </section>
+
+    <section class="card">
       <details id="bh-buho" class="rs-box">
         <summary class="label">한자 원리 <span class="rs-sub">방향·고유부호·뜻·소리 — 최규화</span></summary>
         <div id="bh-buho-body" class="bh-body"></div>
@@ -200,10 +212,11 @@
   <script src="shuowen.js"></script>
   <script src="bushou.js"></script>
   <script src="bunhae/data.js"></script>
-  <script src="bunhae/buho.js?v=29"></script>
-  <script src="bunhae/k80det.js?v=29"></script>
-  <script src="script.js?v=29"></script>
-  <script src="bunhae.js?v=29"></script>
-  <script src="sealdraw.js?v=29"></script>
+  <script src="bunhae/buho.js?v=30"></script>
+  <script src="bunhae/k80det.js?v=30"></script>
+  <script src="bunhae/s100.js?v=30"></script>
+  <script src="script.js?v=30"></script>
+  <script src="bunhae.js?v=30"></script>
+  <script src="sealdraw.js?v=30"></script>
 </body>
 </html>

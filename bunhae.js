@@ -554,6 +554,36 @@
     box.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   let basicsDrawn = false;
+  // ===== 소전 100: 자주 쓰는 부수 100개를 소전 중심으로 =====
+  let s100Drawn = false;
+  function drawS100() {
+    const grid = $("s100-grid");
+    (window.BH_S100 || []).forEach(([rank, rad, sealCh, no, n, ex, v, note]) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "s100-cell";
+      b.title = `${rank}위 ${rad}${v ? "(" + v + ")" : ""} — 교육용 1800자 중 ${n}자: ${ex}${note ? "\n" + note : ""}`;
+      const sb = document.createElement("span");
+      sb.className = "s100-seal";
+      const sl = sealEl(sealCh);
+      if (sl) sb.appendChild(sl);
+      b.appendChild(sb);
+      b.insertAdjacentHTML("beforeend", `<span class="s100-ks"><b>${rad}</b>${v ? `<small>${v}</small>` : ""}</span><span class="s100-meta">${rank} · ${n}자${note ? " *" : ""}</span>`);
+      b.addEventListener("click", () => explain(sealCh));
+      grid.appendChild(b);
+    });
+    const notes = (window.BH_S100 || []).filter((r) => r[7]).map((r) => `* ${r[1]}: ${r[7]}`);
+    if (notes.length) grid.insertAdjacentHTML("afterend", `<p class="hint">${notes.join("<br>")}</p>`);
+  }
+  if ($("s100")) {
+    $("s100").addEventListener("toggle", () => { if ($("s100").open && !s100Drawn) { s100Drawn = true; drawS100(); } });
+    $("s100-send").addEventListener("click", () => {
+      const inp = document.getElementById("input");
+      inp.value = (window.BH_S100 || []).map((r) => r[2]).join("");
+      document.getElementById("btn-convert").click();
+      inp.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   // ===== 기본 부호 참고 칸 =====
   let buhoDrawn = false;
   function drawBuho() {
