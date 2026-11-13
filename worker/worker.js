@@ -263,21 +263,34 @@ const ANSWER_TOOL = {
   },
 };
 async function askTool(env, content, maxTokens) {
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({
-      model: env.MODEL || DEFAULT_MODEL, max_tokens: maxTokens,
-      tools: [ANSWER_TOOL], tool_choice: { type: "tool", name: "answer" },
-      messages: [{ role: "user", content }],
-    }),
-  });
-  if (!r.ok) return { error: { error: "Claude API 오류", status: r.status, detail: (await r.text()).slice(0, 300) } };
-  const o = await r.json();
-  const use = (o.content || []).find((b) => b.type === "tool_use");
-  if (o.stop_reason === "max_tokens") return { error: { error: "AI 답이 너무 길어 중간에 끊겼습니다. 다시 눌러 주세요." } };
-  if (!use || !use.input) return { error: { error: "AI가 서식에 맞는 답을 내지 않았습니다. 다시 눌러 주세요." } };
-  return { input: use.input, usage: o.usage || null };
+  // 서식(answer 도구)으로 답하게 함. 서버가 강제 지정 방식을 받지 않으면(400 tool_choice) 다른 방식으로, 그래도 안 되면 강제 없이 다시 요청
+  const tries = [{ type: "any" }, { type: "tool", name: "answer" }, null];
+  let last = null;
+  for (const choice of tries) {
+    const req = { model: env.MODEL || DEFAULT_MODEL, max_tokens: maxTokens, tools: [ANSWER_TOOL], messages: [{ role: "user", content }] };
+    if (choice) req.tool_choice = choice;
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    if (!r.ok) {
+      const detail = (await r.text()).slice(0, 300);
+      last = { error: "Claude API 오류", status: r.status, detail };
+      if (r.status === 400 && /tool_choice|tool/i.test(detail)) continue;   // 이 방식을 안 받으면 다음 방식으로
+      return { error: last };
+    }
+    const o = await r.json();
+    if (o.stop_reason === "max_tokens") return { error: { error: "AI 답이 너무 길어 중간에 끊겼습니다. 다시 눌러 주세요." } };
+    const use = (o.content || []).find((b) => b.type === "tool_use");
+    if (use && use.input) return { input: use.input, usage: o.usage || null };
+    // 강제 없이 요청해 글로 답한 경우: 글 속의 JSON을 읽음
+    const t = (o.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
+    const m = t.match(/\{[\s\S]*\}/);
+    if (m) { try { return { input: JSON.parse(m[0]), usage: o.usage || null }; } catch (e) { /* 아래로 */ } }
+    return { error: { error: "AI가 서식에 맞는 답을 내지 않았습니다. 다시 눌러 주세요.", detail: t.slice(0, 200) } };
+  }
+  return { error: last };
 }
 
 function cors(origin, allowed) {
