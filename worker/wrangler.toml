@@ -2,6 +2,8 @@
 name = "sojeon-ocr"
 main = "worker.js"
 compatibility_date = "2026-11-01"
+# 대시보드에서 넣은 변수(ACCESS_CODE 등)를 배포 때 지우지 않음
+keep_vars = true
 
 [vars]
 ALLOWED_ORIGIN = "https://meditator-farm.github.io"

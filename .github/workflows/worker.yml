@@ -1,0 +1,29 @@
+# worker/ 폴더가 바뀌면 Cloudflare 워커(sojeon-ocr)에 자동으로 배포
+# 필요한 저장소 비밀값(Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN  — Cloudflare에서 만든 API 토큰(템플릿 "Edit Cloudflare Workers")
+#   CLOUDFLARE_ACCOUNT_ID — Cloudflare 계정 ID
+# 비밀값이 없으면 배포를 건너뜀. API 키(ANTHROPIC_API_KEY)·ACCESS_CODE는 Cloudflare에 있는 그대로 둠.
+name: Deploy worker
+on:
+  push:
+    branches: [main]
+    paths: ["worker/**"]
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 비밀값 확인
+        id: chk
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID 비밀값이 없어 배포를 건너뜁니다."; echo "ok=no" >> "$GITHUB_OUTPUT"
+          else echo "ok=yes" >> "$GITHUB_OUTPUT"; fi
+      - name: 워커 배포
+        if: steps.chk.outputs.ok == 'yes'
+        working-directory: worker
+        run: npx --yes wrangler@4 deploy
