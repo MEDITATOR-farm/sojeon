@@ -509,6 +509,78 @@
     holder.append(bar, msg);
   }
 
+  // ===== 글자 풀이를 카톡으로 보내기 =====
+  const SITE = "https://meditator-farm.github.io/sojeon/";
+  function treeText(n, depth, out) {
+    const pad = "  ".repeat(depth);
+    let tag = "";
+    const k = kIndex(n.c), b = buho(n.c), ri = radIndex(n.c);
+    if (depth > 0 && k !== undefined) tag = ` — 기초자(${K[k].hun})`;
+    else if (depth > 0 && b) tag = ` — 고유부호(${b.mean.join(", ")})`;
+    else if (ri !== undefined) tag = ` — 540부수 ${pad3(R[ri].num)}(저자 분해표)`;
+    out.push(`${pad}${depth ? "└ " : ""}${n.c}${tag}`);
+    if (depth === 0 || (k === undefined && !b && ri === undefined)) (n.parts || []).forEach((p) => treeText(p, depth + 1, out));
+    return out;
+  }
+  function shareText(ch) {
+    const L = [];
+    const so = SEALOF[ch];
+    L.push(`【${ch}】 ${(huneumOf(ch) || "").split(",")[0]}`);
+    if (so) L.push(`(소전: ${so[1] === "本" ? "본자" : so[1] === "古" ? "고문" : so[1] === "重" ? "重文" : "이체자"} ${so[0]}의 소전)`);
+    const ki = kIndex(ch), ri = radIndex(ch), sp = splitCached(ch), jx = jxCached(ch);
+    L.push("", "■ 자형 분해");
+    if (ki !== undefined) L.push(`기초자 80자 — ${K[ki].hun}`);
+    else if (ri !== undefined) L.push(`540부수 ${pad3(R[ri].num)} — 저자(최규화) 분해표 기준`);
+    else if (sp && sp.tree) L.push(...treeText(sp.tree, 0, []));
+    else L.push("(아직 나누지 않음)");
+    const leaves = leafPayload(ch);
+    if (leaves.length) L.push("기본자형: " + leaves.map((l) => l.c + (l.hun ? `(${l.hun})` : "")).join(" + "));
+    if (jx) {
+      L.push("", "■ AI 자형 해석 (기초자 80자 기준)");
+      if (jx.kicho) L.push(jx.kicho);
+      if (jx.jx) L.push("", jx.jx);
+      if (jx.hun) L.push("", "훈: " + jx.hun);
+      if (jx.note) L.push("※ " + jx.note);
+    }
+    const hun = (() => { try { return localStorage.getItem("sojeon-hun-" + ch) || ""; } catch (e) { return ""; } })();
+    if (hun.trim()) L.push("", "■ 내가 지은 훈", hun.trim());
+    L.push("", "자형 분해·해석: 기초자 80자·540부수 분해표(최규화)와 AI 판독. 자전으로 확인 바람.", SITE + "#c=" + encodeURIComponent(ch));
+    return L.join("\n");
+  }
+  async function shareExplain(ch, withSeal, msg) {
+    const text = shareText(ch);
+    let files = [];
+    if (withSeal) {
+      try {
+        const b64 = await sealPng(ch);
+        if (b64) {
+          const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+          files = [new File([bin], `소전_${ch}.png`, { type: "image/png" })];
+        }
+      } catch (e) { /* 그림 없이 */ }
+    }
+    // 휴대폰: 공유 창 → 카카오톡
+    const data = files.length ? { files, text } : { text };
+    if (navigator.share && (!files.length || (navigator.canShare && navigator.canShare({ files })))) {
+      try { await navigator.share(data); return; } catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    // PC: 복사 → 카톡 대화창에 Ctrl+V. 그림을 고르면 그림만 복사(카톡 PC는 한 번에 하나만 붙여 넣음)
+    try {
+      if (files.length && window.ClipboardItem) {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": files[0] })]);
+        msg.textContent = "소전 그림을 복사했습니다. 카톡 대화창에 Ctrl+V로 붙여 넣은 뒤, 「풀이를 카톡으로」를 눌러 글도 붙여 넣으세요.";
+      } else {
+        await navigator.clipboard.writeText(text);
+        msg.textContent = "풀이 글을 복사했습니다. 카톡 대화창에 Ctrl+V로 붙여 넣으세요.";
+      }
+    } catch (e) {
+      msg.textContent = "이 브라우저는 복사를 지원하지 않습니다. 아래 글을 길게 눌러 복사해 주세요.";
+      const ta = document.createElement("textarea");
+      ta.className = "bh-hunbox"; ta.value = text; ta.rows = 10;
+      msg.after(ta);
+    }
+  }
+
   // ===== 글자 풀이 — 소전이 主, 해서는 附 =====
   // 근거: 소전 그림(《說文》 표제자 그림·이체·본자)만 씀. 《說文》 원문의 구성 설명은 쓰지 않음.
   // 기초자 80자 → 540부수(저자 분해표) → 그 밖은 AI가 소전을 보고 나눔.
@@ -531,6 +603,21 @@
     head.appendChild(big);
     head.insertAdjacentHTML("beforeend", `<div><div class="bh-ch">${ch}${via}</div><div class="bh-hun">${huneumOf(ch) || ""}</div></div>`);
     body.appendChild(head);
+    // 이 글자의 풀이(자형 분해·AI 해석)를 카톡으로
+    {
+      const bar = document.createElement("div");
+      bar.className = "buttons bh-share";
+      const b1 = document.createElement("button");
+      b1.type = "button"; b1.className = "btn primary"; b1.textContent = "풀이를 카톡으로";
+      const b2 = document.createElement("button");
+      b2.type = "button"; b2.className = "btn"; b2.textContent = "소전 그림도 함께";
+      const msg = document.createElement("p");
+      msg.className = "hint";
+      b1.addEventListener("click", () => shareExplain(ch, false, msg));
+      b2.addEventListener("click", () => shareExplain(ch, true, msg));
+      bar.append(b1, b2);
+      body.append(bar, msg);
+    }
 
     const ki = kIndex(ch);
     const ri = radIndex(ch);
@@ -707,6 +794,13 @@
       s1800Drawn = true;
       (window.BH_S1800 || []).forEach((g) => $("s1800-groups").appendChild(s1800Group(g)));
     });
+    // 주소 끝이 #c=글자 이면 그 글자의 풀이를 바로 엶 (카톡으로 보낸 링크)
+    const openByChar = () => {
+      const m = location.hash.match(/^#c=(.+)$/);
+      if (m) { try { const c = decodeURIComponent(m[1]); if (c) setTimeout(() => explain(Array.from(c)[0]), 300); } catch (e) { /* 잘못된 주소 */ } }
+    };
+    openByChar();
+    window.addEventListener("hashchange", openByChar);
     const openByHash1800 = () => {
       if (location.hash === "#s1800") { $("s1800").open = true; setTimeout(() => $("s1800").scrollIntoView({ behavior: "smooth", block: "start" }), 300); }
     };
